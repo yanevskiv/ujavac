@@ -24,7 +24,7 @@ public class CodeGenerator extends VisitorAdaptor {
 		// Generate the entry
 		Code.put(Code.enter);
 		Code.put(0); // void main() only
-		Code.put(0 + SemanticAnalyzer.numberOfLocalVars.get(methodNode.obj));
+		Code.put(0 + SemanticAnalyzer.nLocalVars.get(methodNode.obj));
 	}
 
 	public void visit(Method method) {
@@ -233,7 +233,7 @@ public class CodeGenerator extends VisitorAdaptor {
 
 	public void visit(StatementPrint statement) {
 		Code.loadConst(1);
-		if (statement.getExpression().struct == SemanticAnalyzer.STRUCT_INT) {
+		if (statement.getExpression().struct == SemanticAnalyzer.IntType) {
 			Code.put(Code.print);
 		} else { // STRUCT_CHAR
 			Code.put(Code.bprint);
@@ -242,7 +242,7 @@ public class CodeGenerator extends VisitorAdaptor {
 
 	public void visit(StatementPrintWidth statement) {
 		Code.loadConst(statement.getWidth());
-		if (statement.getExpression().struct == SemanticAnalyzer.STRUCT_INT) {
+		if (statement.getExpression().struct == SemanticAnalyzer.IntType) {
 			Code.put(Code.print);
 		} else { // STRUCT_CHAR
 			Code.put(Code.bprint);
@@ -264,7 +264,7 @@ public class CodeGenerator extends VisitorAdaptor {
 			throw new RuntimeException("MJ ne podrzava direktno citanje u element matrice");
 		}
 
-		if (designatorType == SemanticAnalyzer.STRUCT_INT) { // STRUCT_INT
+		if (designatorType == SemanticAnalyzer.IntType) { // STRUCT_INT
 			Code.put(Code.read);
 		} else { // STRUCT_CHAR
 			Code.put(Code.bread);
@@ -282,7 +282,7 @@ public class CodeGenerator extends VisitorAdaptor {
 
 	public void visit(StatementAllocateArray statement) {
 		Code.put(Code.newarray);
-		if (statement.getType().struct == SemanticAnalyzer.STRUCT_CHAR) {
+		if (statement.getType().struct == SemanticAnalyzer.CharType) {
 			Code.put(0);
 		} else {
 			Code.put(1);
@@ -300,7 +300,7 @@ public class CodeGenerator extends VisitorAdaptor {
 
 		// Proceed like with an array
 		Code.put(Code.newarray);
-		if (statement.getType().struct == SemanticAnalyzer.STRUCT_CHAR) {
+		if (statement.getType().struct == SemanticAnalyzer.CharType) {
 			Code.put(0);
 		} else {
 			Code.put(1);

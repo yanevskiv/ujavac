@@ -68,14 +68,14 @@ public class MJCompiler {
 			tsdump();
 			
 			// Semantic errors
-			if (semanticAnalyzer.getNumberOfErrors() > 0) {
-				logger.info("Semantic parser error " + semanticAnalyzer.getNumberOfErrors());
+			if (semanticAnalyzer.getnErrors() > 0) {
+				logger.info("Semantic parser error " + semanticAnalyzer.getnErrors());
 				return;
 			}
 
 			// Program info
 			logger.info("Program " + prog.getProgramName().getName() + " passes Semantic analysis");
-			logger.info("nVars: " + semanticAnalyzer.getNumberOfGlobalVars());
+			logger.info("nVars: " + semanticAnalyzer.getnVars());
 			logger.info("===================================");
 
 			// Code generator
@@ -84,7 +84,7 @@ public class MJCompiler {
 			prog.traverseBottomUp(codeGenerator);
 
 			// Code write
-			Code.dataSize = semanticAnalyzer.getNumberOfGlobalVars();
+			Code.dataSize = semanticAnalyzer.getnVars();
 			Code.mainPc = codeGenerator.getMainPc();
 			if (objFile.exists()) {
 				objFile.delete();

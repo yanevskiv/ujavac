@@ -11,52 +11,66 @@ import rs.etf.pp1.symboltable.concepts.*;
 
 public class SemanticAnalyzer extends VisitorAdaptor {
 
-	private static final Logger LOG = Logger.getLogger(SemanticAnalyzer.class);
+	// Logger
+	private static final Logger logger = Logger.getLogger(SemanticAnalyzer.class);
 
 	// Structs
-	public static final Struct STRUCT_INT = Tab.intType;
-	public static final Struct STRUCT_CHAR = Tab.charType;
-	public static final Struct STRUCT_BOOL = new Struct(Struct.Bool);
-	public static final Struct STRUCT_NONE = new Struct(Struct.None);
+	public static final Struct VoidType = new Struct(Struct.None);
+	public static final Struct BoolType = new Struct(Struct.Bool);
+	public static final Struct IntType = Tab.intType;
+	public static final Struct CharType = Tab.charType;
 
+	// Typename map
 	private final Map<Struct, String> typeNameMap = new HashMap<>();
 
-	public int numberOfGlobalVars = 0;
-	public static Map<Obj, Integer> numberOfLocalVars = new HashMap<>();
-	private int numberOfErrors = 0;
+	// Var/error count
+	public int nVars = 0;
+	public static Map<Obj, Integer> nLocalVars = new HashMap<>();
+	private int nErrors = 0;
 
-	private int constAddressCounter = 0;
-	private int currentMethodAddressCounter = 0;
-	private Obj currentMethod = null;
+	private int adrConst = 0;
+	private int adrMethod = 0;
+	private Obj currMethod = null;
 
-	public int getNumberOfGlobalVars() {
-		return numberOfGlobalVars;
+	// Get nVars
+	public int getnVars() {
+		return nVars;
 	}
 
-	public int getNumberOfErrors() {
-		return numberOfErrors;
+	// Get nErrors
+	public int getnErrors() {
+		return nErrors;
 	}
 
-	private void reportError(String message, SyntaxNode info) {
-		numberOfErrors++;
+	// Show error
+	private void showError(String message, SyntaxNode info) {
+		nErrors++;
 		StringBuilder msg = new StringBuilder(message);
 		int line = (info == null) ? 0 : info.getLine();
-		if (line != 0)
-			msg.append(" na liniji ").append(line);
-		LOG.error(msg.toString());
+		if (line != 0) {
+			msg.append(" on line  ").append(line);
+		}
+		logger.error(msg.toString());
 	}
 
-	public void reportInfo(String message, SyntaxNode info) {
+	// Show info
+	public void showInfo(String message, SyntaxNode info) {
 		StringBuilder msg = new StringBuilder(message);
 		int line = (info == null) ? 0 : info.getLine();
-		if (line != 0)
-			msg.append(" na liniji ").append(line);
-		LOG.info(msg.toString());
+		if (line != 0) {
+			msg.append(" on line ").append(line);
+		}
+		logger.info(msg.toString());
 	}
 
-	// Insert a type to symbol table when needed
+	// Show visit info
+	public void showVisitInfo(SyntaxNode info) {
+		showInfo("Visiting " + info.getClass().getSimpleName(), info);
+	}
+
+	// Insert a type to symbol table
 	private Obj insertType(String name, Struct typeStruct) {
-		LOG.info("Inserting a new type " + name + " into the symbol table");
+		logger.info("Adding a new type " + name);
 
 		Obj typeObj = Tab.insert(Obj.Type, name, typeStruct);
 		typeNameMap.put(typeObj.getType(), name);
@@ -64,15 +78,16 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		return typeObj;
 	}
 
+	// Type name to struct (TODO: Refactor)
 	private Struct typeNameToStruct(String name) throws Exception {
 		Obj typeObj = Tab.find(name);
 		if (typeObj == Tab.noObj) { // Check if the type exists
 			switch (name) {
 			case "void":
-				typeObj = insertType(name, STRUCT_NONE);
+				typeObj = insertType(name, VoidType);
 				return typeObj.getType();
 			case "bool":
-				typeObj = insertType(name, STRUCT_BOOL);
+				typeObj = insertType(name, BoolType);
 				return typeObj.getType();
 
 			default:// Type not found
@@ -88,6 +103,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 	}
 
+	// Struct to type name (TODO: refactor)
 	private String structToTypeName(Struct type) {
 		if (type.getKind() == Struct.Array) {
 			return typeNameMap.get(type.getElemType()) + "[]";
@@ -97,117 +113,126 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 	}
 
 	// Visitor methods
-
-	public void visit(ProgramName programName) {
-		programName.obj = Tab.insert(Obj.Prog, programName.getName(), Tab.noType);
-		Tab.openScope();
-	}
-
 	public void visit(Program program) {
-		numberOfGlobalVars = Tab.currentScope.getnVars();
+		showVisitInfo(program);
+		nVars = Tab.currentScope.getnVars();
 		Tab.chainLocalSymbols(program.getProgramName().obj);
 		Tab.closeScope();
 	}
 
+	public void visit(ProgramName programName) {
+		showVisitInfo(programName);
+		programName.obj = Tab.insert(Obj.Prog, programName.getName(), Tab.noType);
+		Tab.openScope();
+	}
+
+	public void visit(Method method) {
+		showVisitInfo(method);
+
+		// Close method
+		nLocalVars.put(method.obj, Tab.currentScope.getnVars());
+		Tab.chainLocalSymbols(currMethod);
+		Tab.closeScope();
+		currMethod = null;
+		adrMethod = 0;
+	}
+
 	public void visit(MethodTypeName methodTypeName) {
+		showVisitInfo(methodTypeName);
+
+		// Extract type info
 		Type type = methodTypeName.getType();
 		String typeName = type.getTypeName();
 		String methodName = methodTypeName.getName();
 
+		// Assign struct
 		try {
 			type.struct = typeNameToStruct(typeName);
 		} catch (Exception ex) {
-			type.struct = STRUCT_NONE; // Just to avoid an unwanted exception
-			reportError("Tip " + typeName + " nije podrzan u realizaciji za nivo A.", methodTypeName);
+			type.struct = VoidType; // Just to avoid an unwanted exception
+			showError("Unsupported type name '" + typeName + "'", methodTypeName);
 		}
 
-		currentMethod = Tab.insert(Obj.Meth, methodName, type.struct);
-		methodTypeName.obj = currentMethod;
+		// Open method
+		currMethod = Tab.insert(Obj.Meth, methodName, type.struct);
+		methodTypeName.obj = currMethod;
 		Tab.openScope();
-		reportInfo("Obradjuje se funkcija " + methodName + " koja vraca " + typeName, methodTypeName);
-	}
-
-	public void visit(Method method) {
-		LOG.debug("Obradjena je funkcija \"" + method.getMethodTypeName().getName() + "\" koja vraca \""
-				+ method.getMethodTypeName().getType().getTypeName() + "\" tip sa ukupno "
-				+ Tab.currentScope().getnVars() + " lokalnih promenljivih");
-
-		numberOfLocalVars.put(method.obj, Tab.currentScope.getnVars());
-		Tab.chainLocalSymbols(currentMethod);
-		Tab.closeScope();
-
-		currentMethod = null;
-		currentMethodAddressCounter = 0;
 	}
 
 	public void visit(DeclarationConst declaration) {
+		showVisitInfo(declaration);
+
+		// Extract type info
 		Type type = declaration.getType();
 		String typeName = type.getTypeName();
 		String constName = declaration.getSymbolName();
 
+		// Assign struct
 		try {
 			type.struct = typeNameToStruct(typeName);
-
 			declaration.obj = Tab.insert(Obj.Con, constName, type.struct);
 
-			switch (type.struct.getKind()) {
-			case Struct.Int:
+			// Check kind
+			int kind = type.struct.getKind();
+			if (kind == Struct.Int) {
 				declaration.obj.setAdr(declaration.getValue());
-				break;
-			case Struct.Char:
-				break;
-			case Struct.Bool:
-				break;
-			default:
-				reportError("Tip " + typeName + " ne moze da bude konstanta. Samo int, bool ili char.", declaration);
-			}
+			} else if (kind != Struct.Char && kind != Struct.Bool) {
+				showError("Invalid constant type '" + typeName + "'. Only int, bool, char can be constants!", declaration);
+			} 
 
-			LOG.debug("Deklarisana je konstanta \"" + constName + "\" tipa " + typeName);
+			logger.debug("New constant: '" + typeName + " " + constName);
 		} catch (Exception ex) {
-			reportError("Tip " + typeName + " nije deklarisan u tabeli simbola.", declaration);
-			type.struct = STRUCT_NONE; // Just to avoid an unwanted exception
+			showError("Unsupported type name '" + typeName + "'", declaration);
+			type.struct = VoidType;
 			declaration.obj = new Obj(Obj.Con, constName, type.struct);
 		}
 	}
 
+	// Var symbol
 	private void processSingleVarSymbol(Struct typeStruct, VarSymbol symbol) {
 		if (symbol instanceof VarSimple) { // VarSimple
-			VarSimple vs = (VarSimple) symbol;
-			vs.obj = Tab.insert(Obj.Var, vs.getSymbolName(), typeStruct);
-			vs.obj.setAdr(currentMethodAddressCounter++);
+			VarSimple varSimple = (VarSimple) symbol;
+			varSimple.obj = Tab.insert(Obj.Var, varSimple.getSymbolName(), typeStruct);
+			varSimple.obj.setAdr(adrMethod++);
 
-			reportInfo("Deklarisana je " + (vs.obj.getLevel() > 0 ? "lokalna" : "globalna") + " promenljiva \""
-					+ vs.getSymbolName() + "\" tipa " + structToTypeName(typeStruct) + " sa adresom " + vs.obj.getAdr(),
-					symbol);
+			showInfo("New varSymbol: " + structToTypeName(typeStruct) + varSimple.getSymbolName(),  symbol);
+
+			// showInfo("Deklarisana je " + (varSimple.obj.getLevel() > 0 ? "lokalna" : "globalna") + " promenljiva \""
+			// 		+ varSimple.getSymbolName() + "\" tipa " + structToTypeName(typeStruct) + " sa adresom " + varSimple.obj.getAdr(),
+			// 		symbol);
 		} else if (symbol instanceof VarArray) { // VarArray
-			VarArray va = (VarArray) symbol;
-			va.obj = Tab.insert(Obj.Var, va.getSymbolName(), new Struct(Struct.Array, typeStruct));
-			va.obj.setAdr(currentMethodAddressCounter++);
+			VarArray varArray = (VarArray) symbol;
+			varArray.obj = Tab.insert(Obj.Var, varArray.getSymbolName(), new Struct(Struct.Array, typeStruct));
+			varArray.obj.setAdr(adrMethod++);
+			showInfo("New varSymbol: " + structToTypeName(typeStruct) + varArray.getSymbolName() + "[]",  symbol);
 
-			reportInfo(
-					"Deklarisan je " + (va.obj.getLevel() > 0 ? "lokalni" : "globalni") + " niz \"" + va.getSymbolName()
-							+ "\" promenljivih tipa " + structToTypeName(typeStruct) + " sa adresom " + va.obj.getAdr(),
-					symbol);
+			// showInfo(
+			// 		"Deklarisan je " + (varArray.obj.getLevel() > 0 ? "lokalni" : "globalni") + " niz \"" + varArray.getSymbolName()
+			// 				+ "\" promenljivih tipa " + structToTypeName(typeStruct) + " sa adresom " + varArray.obj.getAdr(),
+			// 		symbol);
 		} else { // VarMatrix
-			VarMatrix vm = (VarMatrix) symbol;
-			// Just like an array
-			vm.obj = Tab.insert(Obj.Var, vm.getSymbolName(), new Struct(Struct.Array, typeStruct));
-			vm.obj.setAdr(currentMethodAddressCounter++);
-			reportInfo("Deklarisana je " + (vm.obj.getLevel() > 0 ? "lokalna" : "globalna") + " matrica \""
-					+ vm.getSymbolName() + "\" promenljivih tipa " + structToTypeName(typeStruct) + " sa adresom "
-					+ vm.obj.getAdr(), symbol);
+			VarMatrix varMatrix = (VarMatrix) symbol;
+			varMatrix.obj = Tab.insert(Obj.Var, varMatrix.getSymbolName(), new Struct(Struct.Array, typeStruct));
+			varMatrix.obj.setAdr(adrMethod++);
+			showInfo("New varSymbol: " + structToTypeName(typeStruct) + varMatrix.getSymbolName() + "[][]",  symbol);
+
+			// showInfo("Deklarisana je " + (varMatrix.obj.getLevel() > 0 ? "lokalna" : "globalna") + " matrica \""
+			// 		+ varMatrix.getSymbolName() + "\" promenljivih tipa " + structToTypeName(typeStruct) + " sa adresom "
+			// 		+ varMatrix.obj.getAdr(), symbol);
 		}
 	}
 
+	// Multiple var symbols
 	private void processVarSymbols(Struct typeStruct, VarSymbolList symbols) {
-		if (symbols instanceof VarSymbols) { // VarSymbols
+		if (symbols instanceof VarSymbols) {
 			processSingleVarSymbol(typeStruct, ((VarSymbols) symbols).getVarSymbol());
 			processVarSymbols(typeStruct, ((VarSymbols) symbols).getVarSymbolList());
-		} else { // VarSymbolSingle
+		} else {
 			processSingleVarSymbol(typeStruct, ((VarSymbolSingle) symbols).getVarSymbol());
 		}
 	}
 
+	// Var declaration
 	public void visit(DeclarationVar declaration) {
 		Type type = declaration.getType();
 		String typeName = type.getTypeName();
@@ -215,25 +240,26 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		try {
 			type.struct = typeNameToStruct(typeName);
 		} catch (Exception ex) {
-			reportError("Tip " + typeName + " nije podrzan u realizaciji za nivo A.", declaration);
-			type.struct = STRUCT_NONE; // Just to avoid an unwanted exception
+			showError("Tip " + typeName + " nije podrzan u realizaciji za nivo A.", declaration);
+			type.struct = VoidType; // Just to avoid an unwanted exception
 		}
 
 		processVarSymbols(type.struct, declaration.getVarSymbolList());
 	}
 
+	// Designator
 	public void visit(SimpleDesignator designator) {
 		String name = designator.getDesignatorName();
 		designator.obj = Tab.find(name);
 		if (designator.obj != Tab.noObj) { // Symbol declared
-			LOG.debug(
+			logger.debug(
 					"Detektovano je koriscenje "
 							+ (designator.obj.getKind() == 1
 									? ((designator.obj.getLevel() > 0 ? "lokalne" : "globalne") + " promenljive")
 									: "konstante")
 							+ " \"" + name + "\" tipa " + structToTypeName(designator.obj.getType()));
 		} else { // Symbol not declared (error)
-			reportError("Simbol \"" + designator.getDesignatorName() + "\" nije deklarisan ", designator);
+			showError("Simbol \"" + designator.getDesignatorName() + "\" nije deklarisan ", designator);
 		}
 	}
 
@@ -246,10 +272,10 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			// designator.obj = new Obj(Obj.Elem, name + "_element",
 			// arrayObj.getType().getElemType());
 			designator.obj = arrayObj;
-			LOG.debug("Detektovan je pristup elementu " + (arrayObj.getLevel() > 0 ? "lokalnog" : "globalnog")
+			logger.debug("Detektovan je pristup elementu " + (arrayObj.getLevel() > 0 ? "lokalnog" : "globalnog")
 					+ " niza \"" + name + "\"");
 		} else {
-			reportError("Niz \"" + designator.getArrayName() + "\" nije deklarisan", designator);
+			showError("Niz \"" + designator.getArrayName() + "\" nije deklarisan", designator);
 		}
 	}
 
@@ -262,10 +288,10 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			// designator.obj = new Obj(Obj.Elem, name + "_element",
 			// arrayObj.getType().getElemType());
 			designator.obj = arrayObj;
-			LOG.debug("Detektovan je pristup elementu " + (arrayObj.getLevel() > 0 ? "lokalne" : "globalne")
+			logger.debug("Detektovan je pristup elementu " + (arrayObj.getLevel() > 0 ? "lokalne" : "globalne")
 					+ " matrice \"" + name + "\"");
 		} else {
-			reportError("Matrica \"" + designator.getMatrixName() + "\" nije deklarisan", designator);
+			showError("Matrica \"" + designator.getMatrixName() + "\" nije deklarisan", designator);
 		}
 	}
 
@@ -273,9 +299,9 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 
 	private Struct detectFactorStruct(Factor factor) {
 		if (factor instanceof FactorNumericConstant) { // FactorNumericConstant
-			factor.struct = STRUCT_INT;
+			factor.struct = IntType;
 		} else if (factor instanceof FactorCharConstant) { // CharConstant
-			factor.struct = STRUCT_CHAR;
+			factor.struct = CharType;
 		} else if (factor instanceof FactorDesignator) { // FactorDesignator
 			Designator designator = ((FactorDesignator) factor).getDesignator();
 			if (designator instanceof SimpleDesignator) { // Simple Designator
@@ -295,14 +321,14 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 
 	private Struct detectMulopStruct(MulOperations operationsMul) {
 		if (operationsMul instanceof OperationsMultiplicationEmpty) {
-			return STRUCT_NONE;
+			return VoidType;
 		} else {
 			Struct mulOperationsStruct = detectMulopStruct(
 					((OperationsMultiplication) operationsMul).getMulOperations());
 			Factor factor = ((OperationsMultiplication) operationsMul).getFactor();
 			factor.struct = detectFactorStruct(factor);
-			if (!factor.struct.equals(mulOperationsStruct) && mulOperationsStruct != STRUCT_NONE) {
-				reportError("Nekompatibilni tipovi " + structToTypeName(factor.struct) + " i "
+			if (!factor.struct.equals(mulOperationsStruct) && mulOperationsStruct != VoidType) {
+				showError("Nekompatibilni tipovi " + structToTypeName(factor.struct) + " i "
 						+ structToTypeName(mulOperationsStruct), operationsMul);
 			}
 
@@ -319,16 +345,16 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			term.struct = detectFactorStruct(((TermSimple) term).getFactor());
 			mulopStruct = detectMulopStruct(((TermSimple) term).getMulOperations());
 		}
-		if (!term.struct.equals(mulopStruct) && mulopStruct != STRUCT_NONE) {
-			reportError(
+		if (!term.struct.equals(mulopStruct) && mulopStruct != VoidType) {
+			showError(
 					"Nekompatibilni tipovi " + structToTypeName(term.struct) + " i " + structToTypeName(mulopStruct),
 					term);
 		}
 
 		if (term instanceof TermNegated) {
-			if ((term.struct != STRUCT_INT && term.struct != STRUCT_NONE)
-					|| (mulopStruct != STRUCT_INT && mulopStruct != STRUCT_NONE)) {
-				reportError("'-' sme da stoji samo ispred izraza tipa int", term);
+			if ((term.struct != IntType && term.struct != VoidType)
+					|| (mulopStruct != IntType && mulopStruct != VoidType)) {
+				showError("'-' sme da stoji samo ispred izraza tipa int", term);
 			}
 		}
 
@@ -337,13 +363,13 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 
 	private Struct detectAddopStruct(AddOperations addOperations) {
 		if (addOperations instanceof OperationsAddEmpty) { // OperationsAddEmtpy
-			return STRUCT_NONE;
+			return VoidType;
 		} else {// OperationsAdd
 			Struct addOperationsStruct = detectAddopStruct(((OperationsAdd) addOperations).getAddOperations());
 			Term term = ((OperationsAdd) addOperations).getTerm();
 			term.struct = detectTermType(term);
-			if (!term.struct.equals(addOperationsStruct) && addOperationsStruct != STRUCT_NONE) {
-				reportError("Nekompatibilni tipovi " + structToTypeName(term.struct) + " i "
+			if (!term.struct.equals(addOperationsStruct) && addOperationsStruct != VoidType) {
+				showError("Nekompatibilni tipovi " + structToTypeName(term.struct) + " i "
 						+ structToTypeName(addOperationsStruct), addOperations);
 			}
 
@@ -355,8 +381,8 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		expression.struct = detectTermType(expression.getTerm());
 
 		Struct addOperationsStruct = detectAddopStruct(expression.getAddOperations());
-		if (!expression.struct.equals(addOperationsStruct) && addOperationsStruct != STRUCT_NONE) {
-			reportError("Nekompatibilni tipovi " + structToTypeName(expression.struct) + " i "
+		if (!expression.struct.equals(addOperationsStruct) && addOperationsStruct != VoidType) {
+			showError("Nekompatibilni tipovi " + structToTypeName(expression.struct) + " i "
 					+ structToTypeName(addOperationsStruct), expression);
 		}
 
@@ -383,24 +409,24 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 
 		if (designator.obj.getKind() == Obj.Con) {
-			reportError("Nije dozvoljena dodela vrednosti konstanti", statement);
+			showError("Nije dozvoljena dodela vrednosti konstanti", statement);
 		}
 
 		Struct expressionType = detectExpressionType(statement.getExpression());
 		if (!designatorType.equals(expressionType)) {
-			reportError("Designator \"" + designatorName + "\" je tipa " + structToTypeName(designatorType)
+			showError("Designator \"" + designatorName + "\" je tipa " + structToTypeName(designatorType)
 					+ " a dodeljeni izraz je tipa " + structToTypeName(expressionType), statement);
 		}
 	}
 
 	public void visit(StatementPrint statement) {
-		reportInfo("Detektovana je print instrukcija tipa "
+		showInfo("Detektovana je print instrukcija tipa "
 				+ structToTypeName(detectExpressionType(statement.getExpression())), statement);
 	}
 
 	public void visit(StatementIncrement statement) {
 		if (statement.getDesignator().obj.getKind() == Obj.Con) {
-			reportError("Nije dozvoljeno inkrementiranje konstante", statement);
+			showError("Nije dozvoljeno inkrementiranje konstante", statement);
 		}
 
 		Struct designatorType = statement.getDesignator().obj.getType();
@@ -408,32 +434,32 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			designatorType = designatorType.getElemType();
 		}
 
-		if (!designatorType.equals(STRUCT_INT)) {
-			reportError("Nije dozvoljeno inkrementiranje varijable koja nije tipa int", statement);
+		if (!designatorType.equals(IntType)) {
+			showError("Nije dozvoljeno inkrementiranje varijable koja nije tipa int", statement);
 		}
 	}
 
 	public void visit(StatementDecrement statement) {
 		if (statement.getDesignator().obj.getKind() == Obj.Con) {
-			reportError("Nije dozvoljeno dekrementiranje konstante", statement);
+			showError("Nije dozvoljeno dekrementiranje konstante", statement);
 		}
 
-		if (!statement.getDesignator().obj.getType().equals(STRUCT_INT)) {
-			reportError("Nije dozvoljeno dekrementiranje varijable koja nije tipa int", statement);
+		if (!statement.getDesignator().obj.getType().equals(IntType)) {
+			showError("Nije dozvoljeno dekrementiranje varijable koja nije tipa int", statement);
 		}
 	}
 
 	public void visit(StatementRead statement) {
 		if (statement.getDesignator().obj.getKind() == Obj.Con) {
-			reportError("Nije dozvoljeno citanje vrednosti u konstantu", statement);
+			showError("Nije dozvoljeno citanje vrednosti u konstantu", statement);
 		}
 		Struct type = statement.getDesignator().obj.getType();
 		if (type.getKind() == 3) { // Array
 			type = type.getElemType();
 		}
 
-		if (!type.equals(STRUCT_INT) && !type.equals(STRUCT_CHAR)) {
-			reportError("Nije dozvoljeno citanje vrednosti u varijablu tipa " + structToTypeName(type), statement);
+		if (!type.equals(IntType) && !type.equals(CharType)) {
+			showError("Nije dozvoljeno citanje vrednosti u varijablu tipa " + structToTypeName(type), statement);
 		}
 	}
 
@@ -442,29 +468,29 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		try {
 			statement.getType().struct = typeNameToStruct(statement.getType().getTypeName());
 		} catch (Exception e) {
-			reportError(statement.getType().getTypeName() + " tip nije podrzan", statement);
+			showError(statement.getType().getTypeName() + " tip nije podrzan", statement);
 		}
 		Struct expressionType = detectExpressionType(statement.getExpression());
 
-		if (!expressionType.equals(STRUCT_INT)) {
-			reportError("Velicina niza mora da bude tipa int", statement);
+		if (!expressionType.equals(IntType)) {
+			showError("Velicina niza mora da bude tipa int", statement);
 		}
 
 		if (designatorType.getKind() == Struct.Array) {
 			if (statement.getDesignator() instanceof SimpleDesignator) { // Must be SimpleDesignator
 				if (!designatorType.getElemType().equals(statement.getType().struct)) {
-					reportError("Alocira se niz tipa " + structToTypeName(statement.getType().struct) + ", ali niz \""
+					showError("Alocira se niz tipa " + structToTypeName(statement.getType().struct) + ", ali niz \""
 							+ ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" je tipa "
 							+ structToTypeName(designatorType), statement);
 				}
 			} else { // Bad Matrix
-				reportError(
+				showError(
 						"MicroJava ne podrzava nizove nizova, nego posebno deklarisane matrice (\""
 								+ ((ArrayElementDesignator) statement.getDesignator()).getArrayName() + "[][]\")",
 						statement);
 			}
 		} else { // Not an array
-			reportError("\"" + ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" nije niz",
+			showError("\"" + ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" nije niz",
 					statement);
 		}
 	}
@@ -474,30 +500,30 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		try {
 			statement.getType().struct = typeNameToStruct(statement.getType().getTypeName());
 		} catch (Exception e) {
-			reportError(statement.getType().getTypeName() + " tip nije podrzan", statement);
+			showError(statement.getType().getTypeName() + " tip nije podrzan", statement);
 		}
 		Struct expressionType = detectExpressionType(statement.getExpression());
 		Struct expressionType1 = detectExpressionType(statement.getExpression1());
 
-		if (!expressionType.equals(STRUCT_INT) || !expressionType1.equals(STRUCT_INT)) {
-			reportError("Dimenzije matrice moraju biti tipa int", statement);
+		if (!expressionType.equals(IntType) || !expressionType1.equals(IntType)) {
+			showError("Dimenzije matrice moraju biti tipa int", statement);
 		}
 
 		if (designatorType.getKind() == Struct.Array) {
 			if (statement.getDesignator() instanceof SimpleDesignator) { // Must be SimpleDesignator
 				if (!designatorType.getElemType().equals(statement.getType().struct)) {
-					reportError("Alocira se niz tipa " + structToTypeName(statement.getType().struct) + ", ali niz \""
+					showError("Alocira se niz tipa " + structToTypeName(statement.getType().struct) + ", ali niz \""
 							+ ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" je tipa "
 							+ structToTypeName(designatorType), statement);
 				}
 			} else { // Bad Matrix
-				reportError(
+				showError(
 						"MicroJava ne podrzava matrice nizova, nego samo prostih tipova (\""
 								+ ((ArrayElementDesignator) statement.getDesignator()).getArrayName() + "[][]\")",
 						statement);
 			}
 		} else { // Not an array
-			reportError("\"" + ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" nije niz",
+			showError("\"" + ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" nije niz",
 					statement);
 		}
 	}
@@ -516,12 +542,12 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			// Must match the right side array element type
 			if (designator instanceof SimpleDesignator) {
 				if (!type.equals(designator.obj.getType())) {
-					reportError("\"" + ((SimpleDesignator) designator).getDesignatorName() + "\" treba da bude tipa "
+					showError("\"" + ((SimpleDesignator) designator).getDesignatorName() + "\" treba da bude tipa "
 							+ structToTypeName(type), node);
 				}
 			} else {
 				if (!type.equals(designator.obj.getType().getElemType())) {
-					reportError("\"" + ((ArrayElementDesignator) designator).getArrayName()
+					showError("\"" + ((ArrayElementDesignator) designator).getArrayName()
 							+ "\" treba da bude niz tipa " + structToTypeName(type), node);
 				}
 			}
@@ -542,11 +568,11 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			checkMultiDesignator(statement.getMultiDesignator(), arrayType.getElemType(), statement);
 		} else {
 			if (statement.getDesignator() instanceof SimpleDesignator) {
-				reportError(
+				showError(
 						"\"" + ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" mora biti niz",
 						statement);
 			} else {
-				reportError("\"" + ((ArrayElementDesignator) statement.getDesignator()).getArrayName()
+				showError("\"" + ((ArrayElementDesignator) statement.getDesignator()).getArrayName()
 						+ "\" mora biti niz, a ne element niza", statement);
 			}
 		}
