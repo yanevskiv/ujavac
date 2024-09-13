@@ -248,7 +248,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 	}
 
 	// Designator
-	public void visit(SimpleDesignator designator) {
+	public void visit(DesignatorBaisc designator) {
 		String name = designator.getDesignatorName();
 		designator.obj = Tab.find(name);
 		if (designator.obj != Tab.noObj) { // Symbol declared
@@ -263,7 +263,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 	}
 
-	public void visit(ArrayElementDesignator designator) {
+	public void visit(DesignatorArray designator) {
 		String name = designator.getArrayName();
 		Obj arrayObj = Tab.find(name);
 		if (arrayObj != Tab.noObj) {
@@ -279,7 +279,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 	}
 
-	public void visit(MatrixElementDesignator designator) {
+	public void visit(DesignatorMatrix designator) {
 		String name = designator.getMatrixName();
 		Obj arrayObj = Tab.find(name);
 		if (arrayObj != Tab.noObj) {
@@ -295,41 +295,41 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 	}
 
-	// ********** Expression validation **********
+	// ********** Expr validation **********
 
 	private Struct detectFactorStruct(Factor factor) {
-		if (factor instanceof FactorNumericConstant) { // FactorNumericConstant
+		if (factor instanceof FactorNumber) { // FactorNumber
 			factor.struct = IntType;
-		} else if (factor instanceof FactorCharConstant) { // CharConstant
+		} else if (factor instanceof FactorChar) { // CharConstant
 			factor.struct = CharType;
 		} else if (factor instanceof FactorDesignator) { // FactorDesignator
 			Designator designator = ((FactorDesignator) factor).getDesignator();
-			if (designator instanceof SimpleDesignator) { // Simple Designator
-				factor.struct = Tab.find(((SimpleDesignator) designator).getDesignatorName()).getType();
-			} else if (designator instanceof ArrayElementDesignator) { // ArrayElementDesignator
-				factor.struct = Tab.find(((ArrayElementDesignator) designator).getArrayName()).getType().getElemType();
-			} else { // MatrixElementDesignator
-				factor.struct = Tab.find(((MatrixElementDesignator) designator).getMatrixName()).getType()
+			if (designator instanceof DesignatorBaisc) { // Simple Designator
+				factor.struct = Tab.find(((DesignatorBaisc) designator).getDesignatorName()).getType();
+			} else if (designator instanceof DesignatorArray) { // DesignatorArray
+				factor.struct = Tab.find(((DesignatorArray) designator).getArrayName()).getType().getElemType();
+			} else { // DesignatorMatrix
+				factor.struct = Tab.find(((DesignatorMatrix) designator).getMatrixName()).getType()
 						.getElemType();
 			}
-		} else { // FactorInParenthesis
-			factor.struct = detectExpressionType(((FactorInParenthesis) factor).getExpression());
+		} else { // FactorExpr
+			factor.struct = detectExprType(((FactorExpr) factor).getExpr());
 		}
 
 		return factor.struct;
 	}
 
-	private Struct detectMulopStruct(MulOperations operationsMul) {
-		if (operationsMul instanceof OperationsMultiplicationEmpty) {
+	private Struct detectMulopStruct(FactorList operationsMul) {
+		if (operationsMul instanceof FactorListempty) {
 			return VoidType;
 		} else {
-			Struct mulOperationsStruct = detectMulopStruct(
-					((OperationsMultiplication) operationsMul).getMulOperations());
-			Factor factor = ((OperationsMultiplication) operationsMul).getFactor();
+			Struct FactorListStruct = detectMulopStruct(
+					((FactorListNext) operationsMul).getFactorList());
+			Factor factor = ((FactorListNext) operationsMul).getFactor();
 			factor.struct = detectFactorStruct(factor);
-			if (!factor.struct.equals(mulOperationsStruct) && mulOperationsStruct != VoidType) {
+			if (!factor.struct.equals(FactorListStruct) && FactorListStruct != VoidType) {
 				showError("Nekompatibilni tipovi " + structToTypeName(factor.struct) + " i "
-						+ structToTypeName(mulOperationsStruct), operationsMul);
+						+ structToTypeName(FactorListStruct), operationsMul);
 			}
 
 			return factor.struct;
@@ -338,12 +338,12 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 
 	private Struct detectTermType(Term term) {
 		Struct mulopStruct;
-		if (term instanceof TermNegated) {
-			term.struct = detectFactorStruct(((TermNegated) term).getFactor());
-			mulopStruct = detectMulopStruct(((TermNegated) term).getMulOperations());
-		} else {// TermSimple
-			term.struct = detectFactorStruct(((TermSimple) term).getFactor());
-			mulopStruct = detectMulopStruct(((TermSimple) term).getMulOperations());
+		if (term instanceof TermNegative) {
+			term.struct = detectFactorStruct(((TermNegative) term).getFactor());
+			mulopStruct = detectMulopStruct(((TermNegative) term).getFactorList());
+		} else {// TermBasic
+			term.struct = detectFactorStruct(((TermBasic) term).getFactor());
+			mulopStruct = detectMulopStruct(((TermBasic) term).getFactorList());
 		}
 		if (!term.struct.equals(mulopStruct) && mulopStruct != VoidType) {
 			showError(
@@ -351,7 +351,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 					term);
 		}
 
-		if (term instanceof TermNegated) {
+		if (term instanceof TermNegative) {
 			if ((term.struct != IntType && term.struct != VoidType)
 					|| (mulopStruct != IntType && mulopStruct != VoidType)) {
 				showError("'-' sme da stoji samo ispred izraza tipa int", term);
@@ -361,50 +361,50 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		return term.struct;
 	}
 
-	private Struct detectAddopStruct(AddOperations addOperations) {
-		if (addOperations instanceof OperationsAddEmpty) { // OperationsAddEmtpy
+	private Struct detectAddopStruct(TermList TermList) {
+		if (TermList instanceof TermListEmpty) { // TermListNextEmtpy
 			return VoidType;
-		} else {// OperationsAdd
-			Struct addOperationsStruct = detectAddopStruct(((OperationsAdd) addOperations).getAddOperations());
-			Term term = ((OperationsAdd) addOperations).getTerm();
+		} else {// TermListNext
+			Struct TermListStruct = detectAddopStruct(((TermListNext) TermList).getTermList());
+			Term term = ((TermListNext) TermList).getTerm();
 			term.struct = detectTermType(term);
-			if (!term.struct.equals(addOperationsStruct) && addOperationsStruct != VoidType) {
+			if (!term.struct.equals(TermListStruct) && TermListStruct != VoidType) {
 				showError("Nekompatibilni tipovi " + structToTypeName(term.struct) + " i "
-						+ structToTypeName(addOperationsStruct), addOperations);
+						+ structToTypeName(TermListStruct), TermList);
 			}
 
 			return term.struct;
 		}
 	}
 
-	private Struct detectExpressionType(Expression expression) {
-		expression.struct = detectTermType(expression.getTerm());
+	private Struct detectExprType(Expr Expr) {
+		Expr.struct = detectTermType(Expr.getTerm());
 
-		Struct addOperationsStruct = detectAddopStruct(expression.getAddOperations());
-		if (!expression.struct.equals(addOperationsStruct) && addOperationsStruct != VoidType) {
-			showError("Nekompatibilni tipovi " + structToTypeName(expression.struct) + " i "
-					+ structToTypeName(addOperationsStruct), expression);
+		Struct TermListStruct = detectAddopStruct(Expr.getTermList());
+		if (!Expr.struct.equals(TermListStruct) && TermListStruct != VoidType) {
+			showError("Nekompatibilni tipovi " + structToTypeName(Expr.struct) + " i "
+					+ structToTypeName(TermListStruct), Expr);
 		}
 
-		return expression.struct;
+		return Expr.struct;
 	}
 
 	// ********** Statement validation **********
 
-	public void visit(StatementAssignExpression statement) {
+	public void visit(StatementAssignExpr statement) {
 		Designator designator = statement.getDesignator();
 
 		String designatorName;
 		Struct designatorType;
 
-		if (designator instanceof SimpleDesignator) {
-			designatorName = ((SimpleDesignator) designator).getDesignatorName();
+		if (designator instanceof DesignatorBaisc) {
+			designatorName = ((DesignatorBaisc) designator).getDesignatorName();
 			designatorType = designator.obj.getType();
-		} else if (designator instanceof ArrayElementDesignator) {
-			designatorName = ((ArrayElementDesignator) designator).getArrayName();
+		} else if (designator instanceof DesignatorArray) {
+			designatorName = ((DesignatorArray) designator).getArrayName();
 			designatorType = designator.obj.getType().getElemType();
 		} else {
-			designatorName = ((MatrixElementDesignator) designator).getMatrixName();
+			designatorName = ((DesignatorMatrix) designator).getMatrixName();
 			designatorType = designator.obj.getType().getElemType();
 		}
 
@@ -412,19 +412,19 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			showError("Nije dozvoljena dodela vrednosti konstanti", statement);
 		}
 
-		Struct expressionType = detectExpressionType(statement.getExpression());
-		if (!designatorType.equals(expressionType)) {
+		Struct ExprType = detectExprType(statement.getExpr());
+		if (!designatorType.equals(ExprType)) {
 			showError("Designator \"" + designatorName + "\" je tipa " + structToTypeName(designatorType)
-					+ " a dodeljeni izraz je tipa " + structToTypeName(expressionType), statement);
+					+ " a dodeljeni izraz je tipa " + structToTypeName(ExprType), statement);
 		}
 	}
 
 	public void visit(StatementPrint statement) {
 		showInfo("Detektovana je print instrukcija tipa "
-				+ structToTypeName(detectExpressionType(statement.getExpression())), statement);
+				+ structToTypeName(detectExprType(statement.getExpr())), statement);
 	}
 
-	public void visit(StatementIncrement statement) {
+	public void visit(StatementInc statement) {
 		if (statement.getDesignator().obj.getKind() == Obj.Con) {
 			showError("Nije dozvoljeno inkrementiranje konstante", statement);
 		}
@@ -439,7 +439,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 	}
 
-	public void visit(StatementDecrement statement) {
+	public void visit(StatementDec statement) {
 		if (statement.getDesignator().obj.getKind() == Obj.Con) {
 			showError("Nije dozvoljeno dekrementiranje konstante", statement);
 		}
@@ -463,67 +463,67 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 	}
 
-	public void visit(StatementAllocateArray statement) {
+	public void visit(StatementNewArray statement) {
 		Struct designatorType = statement.getDesignator().obj.getType();
 		try {
 			statement.getType().struct = typeNameToStruct(statement.getType().getTypeName());
 		} catch (Exception e) {
 			showError(statement.getType().getTypeName() + " tip nije podrzan", statement);
 		}
-		Struct expressionType = detectExpressionType(statement.getExpression());
+		Struct ExprType = detectExprType(statement.getExpr());
 
-		if (!expressionType.equals(IntType)) {
+		if (!ExprType.equals(IntType)) {
 			showError("Velicina niza mora da bude tipa int", statement);
 		}
 
 		if (designatorType.getKind() == Struct.Array) {
-			if (statement.getDesignator() instanceof SimpleDesignator) { // Must be SimpleDesignator
+			if (statement.getDesignator() instanceof DesignatorBaisc) { // Must be DesignatorBaisc
 				if (!designatorType.getElemType().equals(statement.getType().struct)) {
 					showError("Alocira se niz tipa " + structToTypeName(statement.getType().struct) + ", ali niz \""
-							+ ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" je tipa "
+							+ ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" je tipa "
 							+ structToTypeName(designatorType), statement);
 				}
 			} else { // Bad Matrix
 				showError(
 						"MicroJava ne podrzava nizove nizova, nego posebno deklarisane matrice (\""
-								+ ((ArrayElementDesignator) statement.getDesignator()).getArrayName() + "[][]\")",
+								+ ((DesignatorArray) statement.getDesignator()).getArrayName() + "[][]\")",
 						statement);
 			}
 		} else { // Not an array
-			showError("\"" + ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" nije niz",
+			showError("\"" + ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" nije niz",
 					statement);
 		}
 	}
 
-	public void visit(StatementAllocateMatrix statement) {
+	public void visit(StatementNewMatrix statement) {
 		Struct designatorType = statement.getDesignator().obj.getType();
 		try {
 			statement.getType().struct = typeNameToStruct(statement.getType().getTypeName());
 		} catch (Exception e) {
 			showError(statement.getType().getTypeName() + " tip nije podrzan", statement);
 		}
-		Struct expressionType = detectExpressionType(statement.getExpression());
-		Struct expressionType1 = detectExpressionType(statement.getExpression1());
+		Struct ExprType = detectExprType(statement.getExpr());
+		Struct ExprType1 = detectExprType(statement.getExpr1());
 
-		if (!expressionType.equals(IntType) || !expressionType1.equals(IntType)) {
+		if (!ExprType.equals(IntType) || !ExprType1.equals(IntType)) {
 			showError("Dimenzije matrice moraju biti tipa int", statement);
 		}
 
 		if (designatorType.getKind() == Struct.Array) {
-			if (statement.getDesignator() instanceof SimpleDesignator) { // Must be SimpleDesignator
+			if (statement.getDesignator() instanceof DesignatorBaisc) { // Must be DesignatorBaisc
 				if (!designatorType.getElemType().equals(statement.getType().struct)) {
 					showError("Alocira se niz tipa " + structToTypeName(statement.getType().struct) + ", ali niz \""
-							+ ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" je tipa "
+							+ ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" je tipa "
 							+ structToTypeName(designatorType), statement);
 				}
 			} else { // Bad Matrix
 				showError(
 						"MicroJava ne podrzava matrice nizova, nego samo prostih tipova (\""
-								+ ((ArrayElementDesignator) statement.getDesignator()).getArrayName() + "[][]\")",
+								+ ((DesignatorArray) statement.getDesignator()).getArrayName() + "[][]\")",
 						statement);
 			}
 		} else { // Not an array
-			showError("\"" + ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" nije niz",
+			showError("\"" + ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" nije niz",
 					statement);
 		}
 	}
@@ -540,14 +540,14 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			}
 
 			// Must match the right side array element type
-			if (designator instanceof SimpleDesignator) {
+			if (designator instanceof DesignatorBaisc) {
 				if (!type.equals(designator.obj.getType())) {
-					showError("\"" + ((SimpleDesignator) designator).getDesignatorName() + "\" treba da bude tipa "
+					showError("\"" + ((DesignatorBaisc) designator).getDesignatorName() + "\" treba da bude tipa "
 							+ structToTypeName(type), node);
 				}
 			} else {
 				if (!type.equals(designator.obj.getType().getElemType())) {
-					showError("\"" + ((ArrayElementDesignator) designator).getArrayName()
+					showError("\"" + ((DesignatorArray) designator).getArrayName()
 							+ "\" treba da bude niz tipa " + structToTypeName(type), node);
 				}
 			}
@@ -567,12 +567,12 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		if (arrayType.getKind() == Struct.Array) {
 			checkMultiDesignator(statement.getMultiDesignator(), arrayType.getElemType(), statement);
 		} else {
-			if (statement.getDesignator() instanceof SimpleDesignator) {
+			if (statement.getDesignator() instanceof DesignatorBaisc) {
 				showError(
-						"\"" + ((SimpleDesignator) statement.getDesignator()).getDesignatorName() + "\" mora biti niz",
+						"\"" + ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" mora biti niz",
 						statement);
 			} else {
-				showError("\"" + ((ArrayElementDesignator) statement.getDesignator()).getArrayName()
+				showError("\"" + ((DesignatorArray) statement.getDesignator()).getArrayName()
 						+ "\" mora biti niz, a ne element niza", statement);
 			}
 		}

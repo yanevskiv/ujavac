@@ -50,12 +50,12 @@ terminal String IDENTIFIER, CHAR;
 
 nonterminal DeclarationList, VarSymbolList,
 			MethodList, FormPars, StatementList, Statement, MultiDesignator,
-			AddOperations, MulOperations, Addop, Mulop;
+			TermList, FactorList, Addop, Mulop;
 
 
 
 nonterminal rs.etf.pp1.symboltable.concepts.Obj Program, ProgramName, ConstSymbol, VarSymbol, Method, MethodTypeName, Designator;
-nonterminal rs.etf.pp1.symboltable.concepts.Struct Type, VarDecl, Term, Factor, Expression;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Type, VarDecl, Term, Factor, Expr;
 
 
 
@@ -135,8 +135,8 @@ nonterminal FormPars;
 nonterminal StatementList;
 nonterminal Statement;
 nonterminal MultiDesignator;
-nonterminal AddOperations;
-nonterminal MulOperations;
+nonterminal TermList;
+nonterminal FactorList;
 nonterminal Addop;
 nonterminal Mulop;
 
@@ -152,7 +152,7 @@ nonterminal rs.etf.pp1.symboltable.concepts.Struct Type;
 nonterminal rs.etf.pp1.symboltable.concepts.Struct VarDecl;
 nonterminal rs.etf.pp1.symboltable.concepts.Struct Term;
 nonterminal rs.etf.pp1.symboltable.concepts.Struct Factor;
-nonterminal rs.etf.pp1.symboltable.concepts.Struct Expression;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Expr;
 
 start with Program;
 
@@ -169,61 +169,61 @@ VarDecl ::=  (DeclarationVar) Type:typeName VarSymbolList:varSymbols SEMICOLON;
 VarSymbolList ::= (VarSymbols) VarSymbolList COMMA VarSymbol:varSymbol
 				| (VarSymbolSingle) VarSymbol:varSymbol;
 			
-VarSymbol ::= (VarSimple) IDENT:symbolName
-			| (VarArray) IDENT:symbolName LSQUARE RSQUARE
-			| (VarMatrix) IDENT:symbolName LSQUARE RSQUARE LSQUARE RSQUARE;
+VarSymbol ::= (VarSymbolSingle) IDENT:symbolName
+			| (VarSymbolArray) IDENT:symbolName LSQUARE RSQUARE
+			| (VarSymbolMatrix) IDENT:symbolName LSQUARE RSQUARE LSQUARE RSQUARE;
 
 Type ::= (Type) IDENT:typeName;
 
-MethodList ::= (MethodListNotEmpty) MethodList Method
+MethodList ::= (MethodListNext) MethodList Method
 			|(MethodListEmpty) /* or empty */;
 			
 Method ::= (Method) MethodTypeName:methodTypeName LPAREN FormPars RPAREN DeclarationList LBRACE StatementList RBRACE;
 MethodTypeName ::= (MethodTypeName) Type:returnType IDENT:name;
-FormPars ::= (FormalParameters) /* empty for now */;
+FormPars ::= (FormPars) /* empty for now */;
 
-StatementList ::= (StatementListNotEmpty) StatementList Statement
+StatementList ::= (StatementListNext) StatementList Statement
 				|	(StatementListEmpty) /* or empty */;
 			
-Statement ::= (StatementAssignExpression) Designator ASSIGN Expression SEMICOLON
+Statement ::= (StatementAssignExpr) Designator ASSIGN Expr SEMICOLON
 			| (StatementMultiAssign) LSQUARE MultiDesignator RSQUARE ASSIGN Designator SEMICOLON
-			| (StatementIncrement) Designator INC SEMICOLON
-			| (StatementDecrement) Designator DEC SEMICOLON
-			| (StatementPrint) PRINT LPAREN Expression RPAREN SEMICOLON
-			| (StatementPrintWidth) PRINT LPAREN Expression COMMA NUMBER:width RPAREN SEMICOLON
+			| (StatementInc) Designator INC SEMICOLON
+			| (StatementDec) Designator DEC SEMICOLON
+			| (StatementPrint) PRINT LPAREN Expr RPAREN SEMICOLON
+			| (StatementPrintWidth) PRINT LPAREN Expr COMMA NUMBER:width RPAREN SEMICOLON
 			| (StatementRead) READ LPAREN Designator RPAREN SEMICOLON
-			| (StatementAllocateArray) Designator ASSIGN NEW Type LSQUARE Expression RSQUARE SEMICOLON
-			| (StatementAllocateMatrix) Designator ASSIGN NEW Type LSQUARE Expression:rowNum RSQUARE LSQUARE Expression:colNum RSQUARE SEMICOLON;
+			| (StatementNewArray) Designator ASSIGN NEW Type LSQUARE Expr RSQUARE SEMICOLON
+			| (StatementNewMatrix) Designator ASSIGN NEW Type LSQUARE Expr:rowNum RSQUARE LSQUARE Expr:colNum RSQUARE SEMICOLON;
 			
 MultiDesignator ::= (MultiDesignatorWithDesignator) Designator COMMA MultiDesignator
 			| (MultiDesignatorSkip) COMMA MultiDesignator
 			| (MultiDesignatorLast) Designator
 			| (MultiDesignatorLastComma) Designator COMMA;
 
-Designator ::= (SimpleDesignator) IDENT:designatorName
-			| (ArrayElementDesignator) IDENT:arrayName LSQUARE Expression RSQUARE
-			| (MatrixElementDesignator) IDENT:matrixName LSQUARE Expression RSQUARE LSQUARE Expression RSQUARE;
+Designator ::= (DesignatorBaisc) IDENT:designatorName
+			| (DesignatorArray) IDENT:arrayName LSQUARE Expr RSQUARE
+			| (DesignatorMatrix) IDENT:matrixName LSQUARE Expr RSQUARE LSQUARE Expr RSQUARE;
 
 
-Expression ::= (Expression) Term AddOperations;
+Expr ::= (Expr) Term TermList;
 
-AddOperations ::= (OperationsAdd) AddOperations Addop:operator Term
-			| (OperationsAddEmpty) /* or empty */;
+TermList ::= (TermListNext) TermList Addop:operator Term
+			| (TermListEmpty) /* or empty */;
 
-Addop ::= (OperatorPlus) ADD
-			| (OperatorMinus) SUB;
+Addop ::= (AddopAdd) ADD
+			| (AddopSub) SUB;
 
-Term ::= (TermSimple) Factor MulOperations
-			| (TermNegated) SUB Factor MulOperations;
+Term ::= (TermBasic) Factor FactorList
+			| (TermNegative) SUB Factor FactorList;
 
-MulOperations ::= (OperationsMultiplication) MulOperations Mulop:operator Factor
-			| (OperationsMultiplicationEmpty) /* or empty */;
+FactorList ::= (FactorListNext) FactorList Mulop:operator Factor
+			| (FactorListempty) /* or empty */;
 
-Mulop ::= (OperatorAsterisk) MUL
-			| (OperatorSlash) DIV
-			| (OperatorPercent) MOD;
+Mulop ::= (MulopMul) MUL
+			| (MulopDiv) DIV
+			| (MulopMod) MOD;
 
-Factor ::= (FactorNumericConstant) NUMBER:value
-			| (FactorCharConstant) CHAR:value
+Factor ::= (FactorNumber) NUMBER:value
+			| (FactorChar) CHAR:value
 			| (FactorDesignator) Designator:symbolName
-			| (FactorInParenthesis) LPAREN Expression RPAREN;
+			| (FactorExpr) LPAREN Expr RPAREN;
