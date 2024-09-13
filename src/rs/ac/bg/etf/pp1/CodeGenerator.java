@@ -14,6 +14,7 @@ public class CodeGenerator extends VisitorAdaptor {
 
 	public void visit(MethodTypeName methodTypeName) {
 
+		// Main method
 		if ("main".equalsIgnoreCase(methodTypeName.getName())) {
 			mainPC = Code.pc;
 		}
@@ -23,7 +24,7 @@ public class CodeGenerator extends VisitorAdaptor {
 
 		// Generate the entry
 		Code.put(Code.enter);
-		Code.put(0); // void main() only
+		Code.put(0);
 		Code.put(0 + SemanticAnalyzer.nLocalVars.get(methodNode.obj));
 	}
 
@@ -38,7 +39,7 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(FactorDesignator factor) {
-		if (factor.getDesignator() instanceof DesignatorBaisc) {
+		if (factor.getDesignator() instanceof DesignatorIdent) {
 			switch (factor.getDesignator().obj.getKind()) {
 			case Obj.Var:
 				Code.load(factor.getDesignator().obj);
@@ -47,12 +48,12 @@ public class CodeGenerator extends VisitorAdaptor {
 				Code.loadConst(factor.getDesignator().obj.getAdr());
 				break;
 			}
-		} else if (factor.getDesignator() instanceof DesignatorArray) { // DesignatorArray
+		} else if (factor.getDesignator() instanceof DesignatorArray) {
 			Code.load(factor.getDesignator().obj);
 			Code.put(Code.dup_x1);
 			Code.put(Code.pop);
 			Code.put(Code.aload);
-		} else {// DesignatorMatrix
+		} else if (factor.getDesignator() instanceof DesignatorMatrix) {
 			Code.load(factor.getDesignator().obj);
 			Code.put(Code.dup_x2);
 			Code.loadConst(0);
@@ -70,20 +71,20 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	// Operations
-	public void visit(FactorListNext operations) {
-		if (operations.getMulop() instanceof MulopMul) {
+	public void visit(FactorListNext listElem) {
+		if (listElem.getMulop() instanceof MulopMul) {
 			Code.put(Code.mul);
-		} else if (operations.getMulop() instanceof MulopDiv) {
+		} else if (listElem.getMulop() instanceof MulopDiv) {
 			Code.put(Code.div);
-		} else { // MulopMod
+		} else if (listElem.getMulop() instanceof MulopMod) {
 			Code.put(Code.rem);
 		}
 	}
 
-	public void visit(TermListNext operations) {
-		if (operations.getAddop() instanceof AddopAdd) {
+	public void visit(TermListNext listElem) {
+		if (listElem.getAddop() instanceof AddopAdd) {
 			Code.put(Code.add);
-		} else { // AddopSub
+		} else if (listElem.getAddop() instanceof AddopSub) {
 			Code.put(Code.sub);
 		}
 	}
@@ -96,7 +97,7 @@ public class CodeGenerator extends VisitorAdaptor {
 	// Statements
 
 	public void visit(StatementAssignExpr statement) {
-		if (statement.getDesignator() instanceof DesignatorBaisc) {
+		if (statement.getDesignator() instanceof DesignatorIdent) {
 			Code.store(statement.getDesignator().obj);
 		} else if (statement.getDesignator() instanceof DesignatorArray) { // DesignatorArray
 			// Code generator is not compatible with the Runtime, hence this
@@ -104,12 +105,11 @@ public class CodeGenerator extends VisitorAdaptor {
 			Code.put(Code.dup_x2);
 			Code.put(Code.pop);
 			Code.put(Code.astore);
-		} else { // DesignatorMatrix
+		} else if (statement.getDesignator() instanceof DesignatorMatrix) {
 			Code.put(Code.dup_x2);
 			Code.put(Code.pop);
 
 			// Matrix index is calculated as 2 + y * m + x
-			// Fuck with the stack until it works
 			Code.load(statement.getDesignator().obj);
 			Code.put(Code.dup_x2);
 			Code.loadConst(0);
@@ -151,7 +151,7 @@ public class CodeGenerator extends VisitorAdaptor {
 			Code.put(Code.pop);
 			Code.put(Code.aload);
 
-			if (singleDesignator instanceof DesignatorBaisc) {
+			if (singleDesignator instanceof DesignatorIdent) {
 				Code.store(singleDesignator.obj);
 			} else if (singleDesignator instanceof DesignatorArray) { // DesignatorArray
 				Code.load(singleDesignator.obj);
@@ -190,7 +190,7 @@ public class CodeGenerator extends VisitorAdaptor {
 
 		Code.loadConst(1);
 		Code.put(Code.add);
-		if (statement.getDesignator() instanceof DesignatorBaisc) {
+		if (statement.getDesignator() instanceof DesignatorIdent) {
 			Code.store(statement.getDesignator().obj);
 		} else {
 			Code.load(statement.getDesignator().obj);
@@ -221,7 +221,7 @@ public class CodeGenerator extends VisitorAdaptor {
 		Code.loadConst(1);
 		Code.put(Code.sub);
 
-		if (statement.getDesignator() instanceof DesignatorBaisc) {
+		if (statement.getDesignator() instanceof DesignatorIdent) {
 			Code.store(statement.getDesignator().obj);
 		} else {
 			Code.load(statement.getDesignator().obj);
@@ -253,8 +253,8 @@ public class CodeGenerator extends VisitorAdaptor {
 		Obj designatorObj;
 		Struct designatorType;
 
-		if (statement.getDesignator() instanceof DesignatorBaisc) {
-			designatorObj = ((DesignatorBaisc) statement.getDesignator()).obj;
+		if (statement.getDesignator() instanceof DesignatorIdent) {
+			designatorObj = ((DesignatorIdent) statement.getDesignator()).obj;
 			designatorType = designatorObj.getType();
 		} else if (statement.getDesignator() instanceof DesignatorArray) { // DesignatorArray
 			designatorObj = ((DesignatorArray) statement.getDesignator()).obj;
@@ -270,7 +270,7 @@ public class CodeGenerator extends VisitorAdaptor {
 			Code.put(Code.bread);
 		}
 
-		if (statement.getDesignator() instanceof DesignatorBaisc) {
+		if (statement.getDesignator() instanceof DesignatorIdent) {
 			Code.store(designatorObj);
 		} else {
 			Code.load(statement.getDesignator().obj);

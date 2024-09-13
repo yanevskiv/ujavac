@@ -65,7 +65,7 @@ terminal Integer NUMBER;
 terminal String IDENT;
 terminal String CHAR;
 
-nonterminal DeclarationList;
+nonterminal DeclList;
 nonterminal VarSymbolList;
 nonterminal MethodList;
 nonterminal FormPars;
@@ -93,20 +93,20 @@ nonterminal rs.etf.pp1.symboltable.concepts.Struct Expr;
 
 start with Program;
 
-Program ::= (Program) PROGRAM ProgramName:programName DeclarationList LBRACE MethodList RBRACE;
+Program ::= (Program) PROGRAM ProgramName:programName DeclList LBRACE MethodList RBRACE;
 ProgramName ::= (ProgramName) IDENT:name;
 
-DeclarationList ::= (DeclarationListWithConst) DeclarationList ConstSymbol
-				|	(DeclarationListWithVar) DeclarationList VarDecl
-				|	(DeclarationListEmpty) /* or empty */;
+DeclList ::= (DeclListConstNext) DeclList ConstSymbol
+		| (DeclListVarNext) DeclList VarDecl
+		| (DeclListEmpty) /* or empty */;
 
-ConstSymbol ::= (DeclarationConst) CONST Type:typeName IDENT:symbolName ASSIGN NUMBER:value SEMICOLON;
+ConstSymbol ::= (ConstSymbol) CONST Type:typeName IDENT:symbolName ASSIGN NUMBER:value SEMICOLON;
 
-VarDecl ::=  (DeclarationVar) Type:typeName VarSymbolList:varSymbols SEMICOLON;
-VarSymbolList ::= (VarSymbols) VarSymbolList COMMA VarSymbol:varSymbol
-				| (VarSymbolSingle) VarSymbol:varSymbol;
+VarDecl ::=  (VarDecl) Type:typeName VarSymbolList:VarListNext SEMICOLON;
+VarSymbolList ::= (VarListNext) VarSymbolList COMMA VarSymbol:varSymbol
+				| (VarListLast) VarSymbol:varSymbol;
 			
-VarSymbol ::= (VarSimple) IDENT:symbolName
+VarSymbol ::= (VarIdent) IDENT:symbolName
 			| (VarArray) IDENT:symbolName LSQUARE RSQUARE
 			| (VarMatrix) IDENT:symbolName LSQUARE RSQUARE LSQUARE RSQUARE;
 
@@ -115,7 +115,7 @@ Type ::= (Type) IDENT:typeName;
 MethodList ::= (MethodListNext) MethodList Method
 			|(MethodListEmpty) /* or empty */;
 			
-Method ::= (Method) MethodTypeName:methodTypeName LPAREN FormPars RPAREN DeclarationList LBRACE StatementList RBRACE;
+Method ::= (Method) MethodTypeName:methodTypeName LPAREN FormPars RPAREN DeclList LBRACE StatementList RBRACE;
 MethodTypeName ::= (MethodTypeName) Type:returnType IDENT:name;
 FormPars ::= (FormPars) /* empty for now */;
 
@@ -137,7 +137,7 @@ MultiDesignator ::= (MultiDesignatorWithDesignator) Designator COMMA MultiDesign
 			| (MultiDesignatorLast) Designator
 			| (MultiDesignatorLastComma) Designator COMMA;
 
-Designator ::= (DesignatorBaisc) IDENT:designatorName
+Designator ::= (DesignatorIdent) IDENT:designatorName
 			| (DesignatorArray) IDENT:arrayName LSQUARE Expr RSQUARE
 			| (DesignatorMatrix) IDENT:matrixName LSQUARE Expr RSQUARE LSQUARE Expr RSQUARE;
 

@@ -159,7 +159,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		Tab.openScope();
 	}
 
-	public void visit(DeclarationConst declaration) {
+	public void visit(ConstSymbol declaration) {
 		showVisitInfo(declaration);
 
 		// Extract type info
@@ -190,15 +190,15 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 
 	// Var symbol
 	private void processSingleVarSymbol(Struct typeStruct, VarSymbol symbol) {
-		if (symbol instanceof VarSimple) { // VarSimple
-			VarSimple varSimple = (VarSimple) symbol;
-			varSimple.obj = Tab.insert(Obj.Var, varSimple.getSymbolName(), typeStruct);
-			varSimple.obj.setAdr(adrMethod++);
+		if (symbol instanceof VarIdent) { // VarIdent
+			VarIdent VarIdent = (VarIdent) symbol;
+			VarIdent.obj = Tab.insert(Obj.Var, VarIdent.getSymbolName(), typeStruct);
+			VarIdent.obj.setAdr(adrMethod++);
 
-			showInfo("New varSymbol: " + structToTypeName(typeStruct) + varSimple.getSymbolName(),  symbol);
+			showInfo("New varSymbol: " + structToTypeName(typeStruct) + VarIdent.getSymbolName(),  symbol);
 
-			// showInfo("Deklarisana je " + (varSimple.obj.getLevel() > 0 ? "lokalna" : "globalna") + " promenljiva \""
-			// 		+ varSimple.getSymbolName() + "\" tipa " + structToTypeName(typeStruct) + " sa adresom " + varSimple.obj.getAdr(),
+			// showInfo("Deklarisana je " + (VarIdent.obj.getLevel() > 0 ? "lokalna" : "globalna") + " promenljiva \""
+			// 		+ VarIdent.getSymbolName() + "\" tipa " + structToTypeName(typeStruct) + " sa adresom " + VarIdent.obj.getAdr(),
 			// 		symbol);
 		} else if (symbol instanceof VarArray) { // VarArray
 			VarArray varArray = (VarArray) symbol;
@@ -223,17 +223,17 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 	}
 
 	// Multiple var symbols
-	private void processVarSymbols(Struct typeStruct, VarSymbolList symbols) {
-		if (symbols instanceof VarSymbols) {
-			processSingleVarSymbol(typeStruct, ((VarSymbols) symbols).getVarSymbol());
-			processVarSymbols(typeStruct, ((VarSymbols) symbols).getVarSymbolList());
+	private void processVarListNext(Struct typeStruct, VarSymbolList symbols) {
+		if (symbols instanceof VarListNext) {
+			processSingleVarSymbol(typeStruct, ((VarListNext) symbols).getVarSymbol());
+			processVarListNext(typeStruct, ((VarListNext) symbols).getVarSymbolList());
 		} else {
-			processSingleVarSymbol(typeStruct, ((VarSymbolSingle) symbols).getVarSymbol());
+			processSingleVarSymbol(typeStruct, ((VarListLast) symbols).getVarSymbol());
 		}
 	}
 
 	// Var declaration
-	public void visit(DeclarationVar declaration) {
+	public void visit(VarDecl declaration) {
 		Type type = declaration.getType();
 		String typeName = type.getTypeName();
 
@@ -244,11 +244,10 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			type.struct = VoidType; // Just to avoid an unwanted exception
 		}
 
-		processVarSymbols(type.struct, declaration.getVarSymbolList());
+		processVarListNext(type.struct, declaration.getVarSymbolList());
 	}
 
-	// Designator
-	public void visit(DesignatorBaisc designator) {
+	public void visit(DesignatorIdent designator) {
 		String name = designator.getDesignatorName();
 		designator.obj = Tab.find(name);
 		if (designator.obj != Tab.noObj) { // Symbol declared
@@ -304,8 +303,8 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			factor.struct = CharType;
 		} else if (factor instanceof FactorDesignator) { // FactorDesignator
 			Designator designator = ((FactorDesignator) factor).getDesignator();
-			if (designator instanceof DesignatorBaisc) { // Simple Designator
-				factor.struct = Tab.find(((DesignatorBaisc) designator).getDesignatorName()).getType();
+			if (designator instanceof DesignatorIdent) { // Simple Designator
+				factor.struct = Tab.find(((DesignatorIdent) designator).getDesignatorName()).getType();
 			} else if (designator instanceof DesignatorArray) { // DesignatorArray
 				factor.struct = Tab.find(((DesignatorArray) designator).getArrayName()).getType().getElemType();
 			} else { // DesignatorMatrix
@@ -361,32 +360,32 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		return term.struct;
 	}
 
-	private Struct detectAddopStruct(TermList TermList) {
-		if (TermList instanceof TermListEmpty) { // TermListNextEmtpy
+	private Struct detectAddopStruct(TermList termList) {
+		if (termList instanceof TermListEmpty) { // TermListNextEmtpy
 			return VoidType;
 		} else {// TermListNext
-			Struct TermListStruct = detectAddopStruct(((TermListNext) TermList).getTermList());
-			Term term = ((TermListNext) TermList).getTerm();
+			Struct termListSturct = detectAddopStruct(((TermListNext) termList).getTermList());
+			Term term = ((TermListNext) termList).getTerm();
 			term.struct = detectTermType(term);
-			if (!term.struct.equals(TermListStruct) && TermListStruct != VoidType) {
+			if (!term.struct.equals(termListSturct) && termListSturct != VoidType) {
 				showError("Nekompatibilni tipovi " + structToTypeName(term.struct) + " i "
-						+ structToTypeName(TermListStruct), TermList);
+						+ structToTypeName(termListSturct), termList);
 			}
 
 			return term.struct;
 		}
 	}
 
-	private Struct detectExprType(Expr Expr) {
-		Expr.struct = detectTermType(Expr.getTerm());
+	private Struct detectExprType(Expr expr) {
+		expr.struct = detectTermType(expr.getTerm());
 
-		Struct TermListStruct = detectAddopStruct(Expr.getTermList());
-		if (!Expr.struct.equals(TermListStruct) && TermListStruct != VoidType) {
-			showError("Nekompatibilni tipovi " + structToTypeName(Expr.struct) + " i "
-					+ structToTypeName(TermListStruct), Expr);
+		Struct termListSturct = detectAddopStruct(expr.getTermList());
+		if (!expr.struct.equals(termListSturct) && termListSturct != VoidType) {
+			showError("Nekompatibilni tipovi " + structToTypeName(expr.struct) + " i "
+					+ structToTypeName(termListSturct), expr);
 		}
 
-		return Expr.struct;
+		return expr.struct;
 	}
 
 	// ********** Statement validation **********
@@ -397,8 +396,8 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		String designatorName;
 		Struct designatorType;
 
-		if (designator instanceof DesignatorBaisc) {
-			designatorName = ((DesignatorBaisc) designator).getDesignatorName();
+		if (designator instanceof DesignatorIdent) {
+			designatorName = ((DesignatorIdent) designator).getDesignatorName();
 			designatorType = designator.obj.getType();
 		} else if (designator instanceof DesignatorArray) {
 			designatorName = ((DesignatorArray) designator).getArrayName();
@@ -412,10 +411,10 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			showError("Nije dozvoljena dodela vrednosti konstanti", statement);
 		}
 
-		Struct ExprType = detectExprType(statement.getExpr());
-		if (!designatorType.equals(ExprType)) {
+		Struct exprType = detectExprType(statement.getExpr());
+		if (!designatorType.equals(exprType)) {
 			showError("Designator \"" + designatorName + "\" je tipa " + structToTypeName(designatorType)
-					+ " a dodeljeni izraz je tipa " + structToTypeName(ExprType), statement);
+					+ " a dodeljeni izraz je tipa " + structToTypeName(exprType), statement);
 		}
 	}
 
@@ -477,10 +476,10 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 
 		if (designatorType.getKind() == Struct.Array) {
-			if (statement.getDesignator() instanceof DesignatorBaisc) { // Must be DesignatorBaisc
+			if (statement.getDesignator() instanceof DesignatorIdent) { // Must be DesignatorIdent
 				if (!designatorType.getElemType().equals(statement.getType().struct)) {
 					showError("Alocira se niz tipa " + structToTypeName(statement.getType().struct) + ", ali niz \""
-							+ ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" je tipa "
+							+ ((DesignatorIdent) statement.getDesignator()).getDesignatorName() + "\" je tipa "
 							+ structToTypeName(designatorType), statement);
 				}
 			} else { // Bad Matrix
@@ -490,7 +489,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 						statement);
 			}
 		} else { // Not an array
-			showError("\"" + ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" nije niz",
+			showError("\"" + ((DesignatorIdent) statement.getDesignator()).getDesignatorName() + "\" nije niz",
 					statement);
 		}
 	}
@@ -510,10 +509,10 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		}
 
 		if (designatorType.getKind() == Struct.Array) {
-			if (statement.getDesignator() instanceof DesignatorBaisc) { // Must be DesignatorBaisc
+			if (statement.getDesignator() instanceof DesignatorIdent) { // Must be DesignatorIdent
 				if (!designatorType.getElemType().equals(statement.getType().struct)) {
 					showError("Alocira se niz tipa " + structToTypeName(statement.getType().struct) + ", ali niz \""
-							+ ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" je tipa "
+							+ ((DesignatorIdent) statement.getDesignator()).getDesignatorName() + "\" je tipa "
 							+ structToTypeName(designatorType), statement);
 				}
 			} else { // Bad Matrix
@@ -523,7 +522,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 						statement);
 			}
 		} else { // Not an array
-			showError("\"" + ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" nije niz",
+			showError("\"" + ((DesignatorIdent) statement.getDesignator()).getDesignatorName() + "\" nije niz",
 					statement);
 		}
 	}
@@ -540,9 +539,9 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			}
 
 			// Must match the right side array element type
-			if (designator instanceof DesignatorBaisc) {
+			if (designator instanceof DesignatorIdent) {
 				if (!type.equals(designator.obj.getType())) {
-					showError("\"" + ((DesignatorBaisc) designator).getDesignatorName() + "\" treba da bude tipa "
+					showError("\"" + ((DesignatorIdent) designator).getDesignatorName() + "\" treba da bude tipa "
 							+ structToTypeName(type), node);
 				}
 			} else {
@@ -567,9 +566,9 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		if (arrayType.getKind() == Struct.Array) {
 			checkMultiDesignator(statement.getMultiDesignator(), arrayType.getElemType(), statement);
 		} else {
-			if (statement.getDesignator() instanceof DesignatorBaisc) {
+			if (statement.getDesignator() instanceof DesignatorIdent) {
 				showError(
-						"\"" + ((DesignatorBaisc) statement.getDesignator()).getDesignatorName() + "\" mora biti niz",
+						"\"" + ((DesignatorIdent) statement.getDesignator()).getDesignatorName() + "\" mora biti niz",
 						statement);
 			} else {
 				showError("\"" + ((DesignatorArray) statement.getDesignator()).getArrayName()
