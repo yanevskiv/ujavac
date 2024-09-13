@@ -22,31 +22,31 @@ public class CodeGenerator extends VisitorAdaptor {
 
 		Method methodNode = (Method) methodTypeName.getParent();
 
-		// Generate the entry
+		// Open method
 		Code.put(Code.enter);
 		Code.put(0);
 		Code.put(0 + SemanticAnalyzer.nLocalVars.get(methodNode.obj));
 	}
 
 	public void visit(Method method) {
+		// Close method
 		Code.put(Code.exit);
 		Code.put(Code.return_);
 	}
 
 	// Factors
+
 	public void visit(FactorNumber factor) {
 		Code.loadConst(factor.getValue());
 	}
 
 	public void visit(FactorDesignator factor) {
 		if (factor.getDesignator() instanceof DesignatorIdent) {
-			switch (factor.getDesignator().obj.getKind()) {
-			case Obj.Var:
+			int kind = factor.getDesignator().obj.getKind();
+			if (kind == Obj.Var) {
 				Code.load(factor.getDesignator().obj);
-				break;
-			case Obj.Con:
+			} else if (kind == Obj.Con) {
 				Code.loadConst(factor.getDesignator().obj.getAdr());
-				break;
 			}
 		} else if (factor.getDesignator() instanceof DesignatorArray) {
 			Code.load(factor.getDesignator().obj);
@@ -109,7 +109,7 @@ public class CodeGenerator extends VisitorAdaptor {
 			Code.put(Code.dup_x2);
 			Code.put(Code.pop);
 
-			// Matrix index is calculated as 2 + y * m + x
+			// Matrix index (2 + y * m + x)
 			Code.load(statement.getDesignator().obj);
 			Code.put(Code.dup_x2);
 			Code.loadConst(0);
@@ -126,73 +126,36 @@ public class CodeGenerator extends VisitorAdaptor {
 		}
 	}
 
-	private void processMultiDesignator(MultiDesignator md, Designator rightArray, int index) {
-		if (md instanceof MultiDesignatorSkip) {
-			processMultiDesignator(((MultiDesignatorSkip) md).getMultiDesignator(), rightArray, index + 1);
-		} else {
-			if (md instanceof MultiDesignatorWithDesignator) {
-				processMultiDesignator(((MultiDesignatorWithDesignator) md).getMultiDesignator(), rightArray,
-						index + 1);
-			}
-
-			Designator singleDesignator;
-			if (md instanceof MultiDesignatorWithDesignator) {
-				singleDesignator = ((MultiDesignatorWithDesignator) md).getDesignator();
-			} else if (md instanceof MultiDesignatorLast) {
-				singleDesignator = ((MultiDesignatorLast) md).getDesignator();
-			} else {// MultiDesignatorLastComma
-				singleDesignator = ((MultiDesignatorLastComma) md).getDesignator();
-			}
-
-			// Load the element from the right side array
-			Code.loadConst(index);
-			Code.load(rightArray.obj);
-			Code.put(Code.dup_x1);
-			Code.put(Code.pop);
-			Code.put(Code.aload);
-
-			if (singleDesignator instanceof DesignatorIdent) {
-				Code.store(singleDesignator.obj);
-			} else if (singleDesignator instanceof DesignatorArray) { // DesignatorArray
-				Code.load(singleDesignator.obj);
-				Code.put(Code.dup_x2);
-				Code.put(Code.pop);
-				Code.put(Code.astore);
-			} else { // DesignatorMatrix
-				// TODO: Implement
-				throw new RuntimeException("MJ ne podrzava upis u element matrice kroz multidesignator");
-			}
-		}
-	}
-
-	public void visit(StatementMultiAssign statement) {
-		processMultiDesignator(statement.getMultiDesignator(), statement.getDesignator(), 0);
-	}
-
 	public void visit(StatementInc statement) {
+		// Need the index on the stack
 		if (statement.getDesignator() instanceof DesignatorArray) {
-			Code.put(Code.dup); // Need that index on the stack to remain for astore
+			Code.put(Code.dup); 
 		}
 
+		// Load designator
 		Code.load(statement.getDesignator().obj);
 
+		// Cannot increment matrix
 		if (statement.getDesignator() instanceof DesignatorMatrix) {
-			// TODO: implement for matrix
-			throw new RuntimeException("MJ ne podrzava direktno inkrementiranje elementa matrice");
+			throw new RuntimeException("Currently unimplemented: cannot increment matrix");
 		}
 
+		// Load array value
 		if (statement.getDesignator() instanceof DesignatorArray) {
 			Code.put(Code.dup_x1);
 			Code.put(Code.pop);
 			Code.put(Code.aload);
 			Code.put(Code.dup);
 		}
-
+		
+		// Add by one
 		Code.loadConst(1);
 		Code.put(Code.add);
+
+		// Store value
 		if (statement.getDesignator() instanceof DesignatorIdent) {
 			Code.store(statement.getDesignator().obj);
-		} else {
+		} else if (statement.getDesignator() instanceof DesignatorArray) {
 			Code.load(statement.getDesignator().obj);
 			Code.put(Code.dup_x2);
 			Code.put(Code.pop);
@@ -201,26 +164,30 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementDec statement) {
+		// Need the index on the stack
 		if (statement.getDesignator() instanceof DesignatorArray) {
-			Code.put(Code.dup); // Need that index on the stack to remain for astore
+			Code.put(Code.dup);
 		}
 
+		// Load designator
 		Code.load(statement.getDesignator().obj);
 
 		if (statement.getDesignator() instanceof DesignatorMatrix) {
-			// TODO: implement for matrix
-			throw new RuntimeException("MJ ne podrzava direktno dekrementiranje elementa matrice");
+			throw new RuntimeException("Currently unimplemented: decrement increment matrix");
 		}
 
+		// Load array value
 		if (statement.getDesignator() instanceof DesignatorArray) {
 			Code.put(Code.dup_x1);
 			Code.put(Code.pop);
 			Code.put(Code.aload);
 		}
 
+		// Sub by one
 		Code.loadConst(1);
 		Code.put(Code.sub);
 
+		// Store value
 		if (statement.getDesignator() instanceof DesignatorIdent) {
 			Code.store(statement.getDesignator().obj);
 		} else {
@@ -233,18 +200,20 @@ public class CodeGenerator extends VisitorAdaptor {
 
 	public void visit(StatementPrint statement) {
 		Code.loadConst(1);
-		if (statement.getExpr().struct == SemanticAnalyzer.IntType) {
+		Struct exprStruct = statement.getExpr().struct;
+		if (exprStruct == SemanticAnalyzer.IntType) {
 			Code.put(Code.print);
-		} else { // STRUCT_CHAR
+		} else if (exprStruct == SemanticAnalyzer.CharType) {
 			Code.put(Code.bprint);
 		}
 	}
 
 	public void visit(StatementPrintWidth statement) {
 		Code.loadConst(statement.getWidth());
-		if (statement.getExpr().struct == SemanticAnalyzer.IntType) {
+		Struct exprStruct = statement.getExpr().struct;
+		if (exprStruct == SemanticAnalyzer.IntType) {
 			Code.put(Code.print);
-		} else { // STRUCT_CHAR
+		} else if (exprStruct == SemanticAnalyzer.CharType) {
 			Code.put(Code.bprint);
 		}
 	}
@@ -259,14 +228,13 @@ public class CodeGenerator extends VisitorAdaptor {
 		} else if (statement.getDesignator() instanceof DesignatorArray) { // DesignatorArray
 			designatorObj = ((DesignatorArray) statement.getDesignator()).obj;
 			designatorType = designatorObj.getType().getElemType();
-		} else { // DesignatorMatrix
-			// TODO: implement
-			throw new RuntimeException("MJ ne podrzava direktno citanje u element matrice");
+		} else  {
+			throw new RuntimeException("Unsupported: cannot read matrix");
 		}
 
-		if (designatorType == SemanticAnalyzer.IntType) { // STRUCT_INT
+		if (designatorType == SemanticAnalyzer.IntType) {
 			Code.put(Code.read);
-		} else { // STRUCT_CHAR
+		} else {
 			Code.put(Code.bread);
 		}
 
@@ -291,21 +259,23 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementNewMatrix statement) {
-		// Preserve dimensions on the Expr stack
+		// Preserve dimensions
 		Code.put(Code.dup2);
-		// Calculate serialized matrix size
+
+		// Calculate linear (1D) size
 		Code.put(Code.mul);
 		Code.loadConst(2);
 		Code.put(Code.add);
 
-		// Proceed like with an array
+		// Create an array (int or char)
 		Code.put(Code.newarray);
 		if (statement.getType().struct == SemanticAnalyzer.CharType) {
 			Code.put(0);
 		} else {
 			Code.put(1);
 		}
-		// Fucking with the Expr stack until it works
+
+		// Store dimension 1
 		Code.put(Code.dup_x2);
 		Code.put(Code.dup_x1);
 		Code.put(Code.pop);
@@ -314,6 +284,7 @@ public class CodeGenerator extends VisitorAdaptor {
 		Code.put(Code.pop);
 		Code.put(Code.astore);
 
+		// Store dimension 2
 		Code.put(Code.dup2);
 		Code.put(Code.pop);
 		Code.put(Code.dup_x1);
@@ -322,6 +293,8 @@ public class CodeGenerator extends VisitorAdaptor {
 		Code.put(Code.dup_x1);
 		Code.put(Code.pop);
 		Code.put(Code.astore);
+
+		// Store matrix
 		Code.store(statement.getDesignator().obj);
 	}
 }

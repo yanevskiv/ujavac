@@ -116,7 +116,9 @@ MethodList ::= (MethodListNext) MethodList Method
 			|(MethodListEmpty) /* or empty */;
 			
 Method ::= (Method) MethodTypeName:methodTypeName LPAREN FormPars RPAREN DeclList LBRACE StatementList RBRACE;
+
 MethodTypeName ::= (MethodTypeName) Type:returnType IDENT:name;
+
 FormPars ::= (FormPars) /* empty for now */;
 
 StatementList ::= (StatementListNext) StatementList Statement

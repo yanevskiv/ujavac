@@ -41,6 +41,10 @@ import java_cup.runtime.Symbol;
 "program"   { return new_symbol(sym.PROGRAM, yytext());}
 "print" 	{ return new_symbol(sym.PRINT, yytext()); }
 "read"		{ return new_symbol(sym.READ, yytext()); }
+"new"		{ return new_symbol(sym.NEW, yytext()); }
+"const"		{ return new_symbol(sym.CONST, yytext()); }
+"true"		{ return new_symbol(sym.TRUE, yytext()); }
+"false"		{ return new_symbol(sym.FALSE, yytext()); }
 
 "++" 		{ return new_symbol(sym.INC, yytext()); }
 "--" 		{ return new_symbol(sym.DEC, yytext()); }
@@ -62,10 +66,6 @@ import java_cup.runtime.Symbol;
 "{" 		{ return new_symbol(sym.LBRACE, yytext()); }
 "}"			{ return new_symbol(sym.RBRACE, yytext()); }
 
-"new"		{ return new_symbol(sym.NEW, yytext()); }
-"const"		{ return new_symbol(sym.CONST, yytext()); }
-"true"		{ return new_symbol(sym.TRUE, yytext()); }
-"false"		{ return new_symbol(sym.FALSE, yytext()); }
 
 "//" { yybegin(COMMENT); }
 <COMMENT> . { yybegin(COMMENT); }
