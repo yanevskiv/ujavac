@@ -227,3 +227,56 @@ Factor ::= (FactorNumber) NUMBER:value
 			| (FactorChar) CHAR:value
 			| (FactorDesignator) Designator:symbolName
 			| (FactorExpr) LPAREN Expr RPAREN;
+
+
+
+
+	private void checkMultiDesignator(MultiDesignator multiDesignator, Struct type, SyntaxNode node) {
+		if (!(multiDesignator instanceof MultiDesignatorSkip)) { // Has a designator
+			Designator designator; // Designator from the left side
+			if (multiDesignator instanceof MultiDesignatorWithDesignator) {
+				designator = ((MultiDesignatorWithDesignator) multiDesignator).getDesignator();
+			} else if (multiDesignator instanceof MultiDesignatorLast) {
+				designator = ((MultiDesignatorLast) multiDesignator).getDesignator();
+			} else { // MultiDesignatorLastComma
+				designator = ((MultiDesignatorLastComma) multiDesignator).getDesignator();
+			}
+
+			// Must match the right side array element type
+			if (designator instanceof DesignatorIdent) {
+				if (!type.equals(designator.obj.getType())) {
+					showError("\"" + ((DesignatorIdent) designator).getDesignatorName() + "\" treba da bude tipa "
+							+ structToTypeName(type), node);
+				}
+			} else {
+				if (!type.equals(designator.obj.getType().getElemType())) {
+					showError("\"" + ((DesignatorArray) designator).getArrayName()
+							+ "\" treba da bude niz tipa " + structToTypeName(type), node);
+				}
+			}
+
+			if (multiDesignator instanceof MultiDesignatorWithDesignator) {
+				checkMultiDesignator(((MultiDesignatorWithDesignator) multiDesignator).getMultiDesignator(), type,
+						node);
+			}
+		} else { // Skip
+			checkMultiDesignator(((MultiDesignatorSkip) multiDesignator).getMultiDesignator(), type, node);
+		}
+	}
+
+	// Deprecated
+	public void visit(StatementMultiAssign statement) {
+		Struct arrayType = statement.getDesignator().obj.getType();
+		if (arrayType.getKind() == Struct.Array) {
+			checkMultiDesignator(statement.getMultiDesignator(), arrayType.getElemType(), statement);
+		} else {
+			if (statement.getDesignator() instanceof DesignatorIdent) {
+				showError(
+						"\"" + ((DesignatorIdent) statement.getDesignator()).getDesignatorName() + "\" mora biti niz",
+						statement);
+			} else {
+				showError("\"" + ((DesignatorArray) statement.getDesignator()).getArrayName()
+						+ "\" mora biti niz, a ne element niza", statement);
+			}
+		}
+	}
