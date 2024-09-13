@@ -20,73 +20,83 @@ import rs.etf.pp1.symboltable.Tab;
 
 public class MJCompiler {
 
+	// Logger setup
 	static {
 		DOMConfigurator.configure(Log4JUtils.instance().findLoggerConfigFile());
 		Log4JUtils.instance().prepareLogFile(Logger.getRootLogger());
 	}
+	private static final Logger logger = Logger.getLogger(MJCompiler.class);
 
-	private static final Logger LOG = Logger.getLogger(MJCompiler.class);
-
+	// tsdump
 	public static void tsdump() {
 		Tab.dump();
 	}
 
+	// Main function (MJCompiler)
 	public static void main(String[] args) throws Exception {
+		logger.info("PP1 - Ivan Janevski - 2016/0270");
 
-		LOG.info("MJCompiler v0.1 - RAJOVIC");
-
-		File sourceFile = new File(args[0]);
-		File objFile;
+		// Source/object file
+		File objFile = null, sourceFile = new File(args[0]);
 		if (sourceFile.getAbsolutePath().endsWith(".mj")) {
-			objFile = new File(
-					sourceFile.getAbsolutePath().substring(0, sourceFile.getAbsolutePath().lastIndexOf(".mj"))
-							+ ".obj");
+			String objPath = sourceFile.getAbsolutePath().substring(0, sourceFile.getAbsolutePath().lastIndexOf(".mj")) + ".obj";
+			objFile = new File(objPath);
 		} else {
-			objFile = new File(sourceFile.getAbsolutePath() + ".obj");
+			logger.error("Source file must end in .mj extensnion");
+			return;
 		}
 
 		try (Reader bufferedReader = new BufferedReader(new FileReader(sourceFile))) {
-			LOG.info("Prevodim: " + sourceFile.getAbsolutePath());
 
+			// Lexer
+			logger.info("===== Lexer =====");
 			Yylex lexer = new Yylex(bufferedReader);
 
+			// Parser
 			MJParser parser = new MJParser(lexer);
-			Symbol rootSymbol = parser.parse(); // Parsiranje
+			Symbol rootSymbol = parser.parse();
 			Program prog = (Program) (rootSymbol.value);
-			LOG.info(prog.toString("")); // Ispis sintaksnog stabla
+			logger.info(prog.toString(""));
 
-			LOG.info("===================================");
+			// Semantic Analyzer
+			logger.info(" ===== Semantic Analysis =====");
 			Tab.init();
 			SemanticAnalyzer semanticAnalyzer = new SemanticAnalyzer();
 			prog.traverseBottomUp(semanticAnalyzer);
-
+			
+			// Dump symbol table
 			tsdump();
-
+			
+			// Semantic errors
 			if (semanticAnalyzer.getNumberOfErrors() > 0) {
-				LOG.info("Semantički prolaz je detektovao " + semanticAnalyzer.getNumberOfErrors() + " gresaka");
+				logger.info("Semantic parser error " + semanticAnalyzer.getNumberOfErrors());
 				return;
 			}
 
-			LOG.info("Program " + prog.getProgramName().getName() + " je semanticki ispravan");
-			LOG.info("Ukupno globalnih promenljivih: " + semanticAnalyzer.getNumberOfGlobalVars());
-			LOG.info("===================================");
+			// Program info
+			logger.info("Program " + prog.getProgramName().getName() + " passes Semantic analysis");
+			logger.info("nVars: " + semanticAnalyzer.getNumberOfGlobalVars());
+			logger.info("===================================");
+
+			// Code generator
+			logger.info(" ===== Code Generation =====");
 			CodeGenerator codeGenerator = new CodeGenerator();
 			prog.traverseBottomUp(codeGenerator);
 
+			// Code write
 			Code.dataSize = semanticAnalyzer.getNumberOfGlobalVars();
 			Code.mainPc = codeGenerator.getMainPc();
-
 			if (objFile.exists()) {
 				objFile.delete();
 			}
 
-			LOG.info("Writing to " + objFile.getPath());
+			logger.info("Writing to " + objFile.getPath());
 			try (OutputStream outputStream = new FileOutputStream(objFile)) {
 				Code.write(outputStream);
 			}
 		} catch (IOException ex) {
 			ex.printStackTrace();
-			LOG.error(ex.getMessage(), ex);
+			logger.error(ex.getMessage(), ex);
 		}
 	}
 }
