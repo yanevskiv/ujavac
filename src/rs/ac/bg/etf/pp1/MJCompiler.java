@@ -74,8 +74,10 @@ public class MJCompiler {
 			}
 
 			// Program info
+			logger.info("===================================");
 			logger.info("Program " + prog.getProgramName().getName() + " passes Semantic analysis");
 			logger.info("nVars: " + semanticAnalyzer.getnVars());
+			logger.info("nPrints: " + semanticAnalyzer.getnPrints());
 			logger.info("===================================");
 
 			// Code generator

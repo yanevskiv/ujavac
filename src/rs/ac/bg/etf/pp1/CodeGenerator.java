@@ -40,6 +40,10 @@ public class CodeGenerator extends VisitorAdaptor {
 		Code.loadConst(factor.getValue());
 	}
 
+	public void visit(FactorChar factor) {
+		Code.loadConst(factor.getValue().charAt(1));
+	}
+
 	public void visit(FactorDesignator factor) {
 		if (factor.getDesignator() instanceof DesignatorIdent) {
 			int kind = factor.getDesignator().obj.getKind();
@@ -65,12 +69,7 @@ public class CodeGenerator extends VisitorAdaptor {
 			Code.put(Code.aload);
 		}
 	}
-
-	public void visit(FactorChar factor) {
-		Code.loadConst(factor.getValue().charAt(1));
-	}
-
-	// Operations
+	
 	public void visit(FactorListNext listElem) {
 		if (listElem.getMulop() instanceof MulopMul) {
 			Code.put(Code.mul);

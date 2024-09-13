@@ -43,6 +43,11 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		return nErrors;
 	}
 
+	// Get nPrints
+	public int getnPrints() {
+		return nPrints;
+	}
+
 	// Show error
 	private void showError(String message, SyntaxNode info) {
 		nErrors++;
@@ -164,6 +169,8 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		Tab.openScope();
 	}
 
+	// Symbol list validation
+
 	public void visit(ConstSymbol declaration) {
 		showVisitInfo(declaration);
 
@@ -243,6 +250,8 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		processVarListNext(type.struct, varDecl.getVarSymbolList());
 	}
 
+	// Designator validation
+
 	public void visit(DesignatorIdent designatorIdent) {
 
 		// Get name info
@@ -280,110 +289,6 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		} else {
 			showError("Undeclared matrix '" + name + "[][]'", designatorMatrix);
 		}
-	}
-
-	// Expr validation
-
-	private Struct detectFactorStruct(Factor factor) {
-		if (factor instanceof FactorNumber) {
-			factor.struct = IntType;
-		} else if (factor instanceof FactorChar) {
-			factor.struct = CharType;
-		} else if (factor instanceof FactorExpr) {
-			factor.struct = detectExprType(((FactorExpr) factor).getExpr());
-		} else if (factor instanceof FactorDesignator) {
-			Designator designator = ((FactorDesignator) factor).getDesignator();
-			if (designator instanceof DesignatorIdent) {
-				factor.struct = Tab.find(((DesignatorIdent) designator).getDesignatorName()).getType();
-			} else if (designator instanceof DesignatorArray) { 
-				factor.struct = Tab.find(((DesignatorArray) designator).getArrayName()).getType().getElemType();
-			} else if (designator instanceof DesignatorMatrix) {
-				factor.struct = Tab.find(((DesignatorMatrix) designator).getMatrixName()).getType().getElemType();
-			}
-		}
-		return factor.struct;
-	}
-
-	private Struct detectMulopStruct(FactorList factorList) {
-		if (factorList instanceof FactorListempty) {
-			return VoidType;
-		}
-
-		// Extract struct info
-		Struct factorListStruct = detectMulopStruct(((FactorListNext) factorList).getFactorList());
-		Factor factor = ((FactorListNext) factorList).getFactor();
-		factor.struct = detectFactorStruct(factor);
-
-		// Compatibility check
-		if (!factor.struct.equals(factorListStruct) && factorListStruct != VoidType) {
-			String typeLeft = structToTypeName(factorListStruct);
-			String typeRight = structToTypeName(factor.struct);
-			showError("Incompatible multiplication types '" + typeLeft + "' and '" + typeRight, factorList);
-		}
-
-		return factor.struct;
-	}
-
-	private Struct detectTermType(Term term) {
-		// Extract struct info
-		Struct mulopStruct = VoidType;
-		if (term instanceof TermNegative) {
-			term.struct = detectFactorStruct(((TermNegative) term).getFactor());
-			mulopStruct = detectMulopStruct(((TermNegative) term).getFactorList());
-		} else if (term instanceof TermBasic) {
-			term.struct = detectFactorStruct(((TermBasic) term).getFactor());
-			mulopStruct = detectMulopStruct(((TermBasic) term).getFactorList());
-		}
-
-		// Compatibility check
-		if (!term.struct.equals(mulopStruct) && mulopStruct != VoidType) {
-			String typeLeft = structToTypeName(mulopStruct);
-			String typeRight = structToTypeName(term.struct);
-			showError("Incompatible addition types '" + typeLeft + "' and '" + typeRight, term);
-		}
-
-		// Cannot negate anything but int type
-		if (term instanceof TermNegative) {
-			if ((term.struct != IntType && term.struct != VoidType) || (mulopStruct != IntType && mulopStruct != VoidType)) {
-				showError("Only 'int' types can be negated", term);
-			}
-		}
-
-		return term.struct;
-	}
-
-	private Struct detectAddopStruct(TermList termList) {
-		if (termList instanceof TermListEmpty) {
-			return VoidType;
-		}
-		
-		// Extract struct info
-		Struct termListSturct = detectAddopStruct(((TermListNext) termList).getTermList());
-		Term term = ((TermListNext) termList).getTerm();
-		term.struct = detectTermType(term);
-
-		// Compatibilty check
-		if (!term.struct.equals(termListSturct) && termListSturct != VoidType) {
-			String typeLeft = structToTypeName(termListSturct);
-			String typeRight = structToTypeName(term.struct);
-			showError("Incompatible addition types '" + typeLeft + "' and '" + typeRight, term);
-		}
-
-		return term.struct;
-	}
-
-	private Struct detectExprType(Expr expr) {
-		expr.struct = detectTermType(expr.getTerm());
-		Struct termListSturct = detectAddopStruct(expr.getTermList());
-
-		// Compatibility check
-		if (!expr.struct.equals(termListSturct) && termListSturct != VoidType) {
-			String typeLeft = structToTypeName(termListSturct);
-			String typeRight = structToTypeName(expr.struct);
-			showError("Incompatible expression types '" + typeLeft + "' and '" + typeRight, expr);
-		}
-
-		return expr.struct;
 	}
 
 	// Statement validation
@@ -563,5 +468,109 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 		} else { // Not a matri
 			showError("Cannot assign matrix to a non-matrix variable", statement);
 		}
+	}
+
+	// Expr validation
+
+	private Struct detectFactorStruct(Factor factor) {
+		if (factor instanceof FactorNumber) {
+			factor.struct = IntType;
+		} else if (factor instanceof FactorChar) {
+			factor.struct = CharType;
+		} else if (factor instanceof FactorExpr) {
+			factor.struct = detectExprType(((FactorExpr) factor).getExpr());
+		} else if (factor instanceof FactorDesignator) {
+			Designator designator = ((FactorDesignator) factor).getDesignator();
+			if (designator instanceof DesignatorIdent) {
+				factor.struct = Tab.find(((DesignatorIdent) designator).getDesignatorName()).getType();
+			} else if (designator instanceof DesignatorArray) { 
+				factor.struct = Tab.find(((DesignatorArray) designator).getArrayName()).getType().getElemType();
+			} else if (designator instanceof DesignatorMatrix) {
+				factor.struct = Tab.find(((DesignatorMatrix) designator).getMatrixName()).getType().getElemType();
+			}
+		}
+		return factor.struct;
+	}
+
+	private Struct detectMulopStruct(FactorList factorList) {
+		if (factorList instanceof FactorListempty) {
+			return VoidType;
+		}
+
+		// Extract struct info
+		Struct factorListStruct = detectMulopStruct(((FactorListNext) factorList).getFactorList());
+		Factor factor = ((FactorListNext) factorList).getFactor();
+		factor.struct = detectFactorStruct(factor);
+
+		// Compatibility check
+		if (!factor.struct.equals(factorListStruct) && factorListStruct != VoidType) {
+			String typeLeft = structToTypeName(factorListStruct);
+			String typeRight = structToTypeName(factor.struct);
+			showError("Incompatible multiplication types '" + typeLeft + "' and '" + typeRight, factorList);
+		}
+
+		return factor.struct;
+	}
+
+	private Struct detectTermType(Term term) {
+		// Extract struct info
+		Struct mulopStruct = VoidType;
+		if (term instanceof TermNegative) {
+			term.struct = detectFactorStruct(((TermNegative) term).getFactor());
+			mulopStruct = detectMulopStruct(((TermNegative) term).getFactorList());
+		} else if (term instanceof TermBasic) {
+			term.struct = detectFactorStruct(((TermBasic) term).getFactor());
+			mulopStruct = detectMulopStruct(((TermBasic) term).getFactorList());
+		}
+
+		// Compatibility check
+		if (!term.struct.equals(mulopStruct) && mulopStruct != VoidType) {
+			String typeLeft = structToTypeName(mulopStruct);
+			String typeRight = structToTypeName(term.struct);
+			showError("Incompatible addition types '" + typeLeft + "' and '" + typeRight, term);
+		}
+
+		// Cannot negate anything but int type
+		if (term instanceof TermNegative) {
+			if ((term.struct != IntType && term.struct != VoidType) || (mulopStruct != IntType && mulopStruct != VoidType)) {
+				showError("Only 'int' types can be negated", term);
+			}
+		}
+
+		return term.struct;
+	}
+
+	private Struct detectAddopStruct(TermList termList) {
+		if (termList instanceof TermListEmpty) {
+			return VoidType;
+		}
+		
+		// Extract struct info
+		Struct termListSturct = detectAddopStruct(((TermListNext) termList).getTermList());
+		Term term = ((TermListNext) termList).getTerm();
+		term.struct = detectTermType(term);
+
+		// Compatibilty check
+		if (!term.struct.equals(termListSturct) && termListSturct != VoidType) {
+			String typeLeft = structToTypeName(termListSturct);
+			String typeRight = structToTypeName(term.struct);
+			showError("Incompatible addition types '" + typeLeft + "' and '" + typeRight, term);
+		}
+
+		return term.struct;
+	}
+
+	private Struct detectExprType(Expr expr) {
+		expr.struct = detectTermType(expr.getTerm());
+		Struct termListSturct = detectAddopStruct(expr.getTermList());
+
+		// Compatibility check
+		if (!expr.struct.equals(termListSturct) && termListSturct != VoidType) {
+			String typeLeft = structToTypeName(termListSturct);
+			String typeRight = structToTypeName(expr.struct);
+			showError("Incompatible expression types '" + typeLeft + "' and '" + typeRight, expr);
+		}
+
+		return expr.struct;
 	}
 }
