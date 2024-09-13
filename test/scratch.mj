@@ -31,3 +31,199 @@
 		
 		print(mat[1][2]); // 4
 		print(mat[0][2]); // 5
+
+
+
+
+
+
+
+		
+terminal PROGRAM, PRINT, READ, NEW;
+terminal PLUS, MINUS, ASTERISK, SLASH, PERCENT, INCREMENT, DECREMENT, ASSIGN;
+terminal SEMICOLON, COMMA, LPAREN, RPAREN, LBRACE, RBRACE, LSQUARE, RSQUARE;
+terminal CONST_MODIFIER, TRUE, FALSE;
+
+terminal Integer NUMBER;
+terminal String IDENTIFIER, CHAR;
+
+
+nonterminal DeclarationList, VarSymbolList,
+			MethodList, FormPars, StatementList, Statement, MultiDesignator,
+			AddOperations, MulOperations, Addop, Mulop;
+
+
+
+nonterminal rs.etf.pp1.symboltable.concepts.Obj Program, ProgramName, ConstSymbol, VarSymbol, Method, MethodTypeName, Designator;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Type, VarDecl, Term, Factor, Expression;
+
+
+
+
+package rs.ac.bg.etf.pp1;
+
+import java_cup.runtime.*;
+import org.apache.log4j.*;
+import rs.ac.bg.etf.pp1.ast.*;
+import rs.etf.pp1.symboltable.concepts.*;
+
+parser code {:
+
+	Logger log = Logger.getLogger(getClass());  
+    
+    public void report_fatal_error(String message, Object info) throws java.lang.Exception {
+      done_parsing();
+      report_error(message, info);
+    }
+  
+    public void syntax_error(Symbol cur_token) {
+        report_error("\nSintaksna greska", cur_token);
+    }
+  
+    public void unrecovered_syntax_error(Symbol cur_token) throws java.lang.Exception {
+        report_fatal_error("Fatalna greska, parsiranje se ne moze nastaviti", cur_token);
+    }
+
+    public void report_error(String message, Object info) {
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.error(msg.toString());
+    }
+:}
+
+
+scan with {:
+	Symbol s = this.getScanner().next_token();
+	if (s != null && s.value != null) 
+		log.info(s.toString() + " " + s.value.toString());
+	return s;
+:}
+
+
+terminal PROGRAM;
+terminal PRINT;
+terminal READ;
+terminal NEW;
+terminal ADD;
+terminal SUB;
+terminal MUL;
+terminal DIV;
+terminal MOD;
+terminal INC;
+terminal DEC;
+terminal ASSIGN;
+terminal SEMICOLON;
+terminal COMMA;
+terminal LPAREN;
+terminal RPAREN;
+terminal LSQUARE;
+terminal RSQUARE;
+terminal LBRACE;
+terminal RBRACE;
+terminal CONST_MODIFIER;
+terminal TRUE;
+terminal FALSE;
+terminal Integer NUMBER;
+terminal String IDENT;
+terminal String CHAR;
+
+nonterminal DeclarationConst;
+nonterminal VarSymbolList;
+nonterminal MethodList;
+nonterminal FormPars;
+nonterminal StatementList;
+nonterminal Statement;
+nonterminal MultiDesignator;
+nonterminal AddOperations;
+nonterminal MulOperations;
+nonterminal Addop;
+nonterminal Mulop;
+
+nonterminal rs.etf.pp1.symboltable.concepts.Obj Program;
+nonterminal rs.etf.pp1.symboltable.concepts.Obj ProgramName;
+nonterminal rs.etf.pp1.symboltable.concepts.Obj ConstSymbol;
+nonterminal rs.etf.pp1.symboltable.concepts.Obj VarSymbol;
+nonterminal rs.etf.pp1.symboltable.concepts.Obj Method;
+nonterminal rs.etf.pp1.symboltable.concepts.Obj MethodTypeName;
+nonterminal rs.etf.pp1.symboltable.concepts.Obj Designator;
+
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Type;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct VarDecl;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Term;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Factor;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Expression;
+
+start with Program;
+
+Program ::= (Program) PROGRAM ProgramName:programName DeclarationList LBRACE MethodList RBRACE;
+ProgramName ::= (ProgramName) IDENT:name;
+
+DeclarationList ::= (DeclarationListWithConst) DeclarationList ConstSymbol
+				|	(DeclarationListWithVar) DeclarationList VarDecl
+				|	(DeclarationListEmpty) /* or empty */;
+
+ConstSymbol ::= (DeclarationConst) CONST_MODIFIER Type:typeName IDENT:symbolName ASSIGN NUMBER:value SEMICOLON;
+
+VarDecl ::=  (DeclarationVar) Type:typeName VarSymbolList:varSymbols SEMICOLON;
+VarSymbolList ::= (VarSymbols) VarSymbolList COMMA VarSymbol:varSymbol
+				| (VarSymbolSingle) VarSymbol:varSymbol;
+			
+VarSymbol ::= (VarSimple) IDENT:symbolName
+			| (VarArray) IDENT:symbolName LSQUARE RSQUARE
+			| (VarMatrix) IDENT:symbolName LSQUARE RSQUARE LSQUARE RSQUARE;
+
+Type ::= (Type) IDENT:typeName;
+
+MethodList ::= (MethodListNotEmpty) MethodList Method
+			|(MethodListEmpty) /* or empty */;
+			
+Method ::= (Method) MethodTypeName:methodTypeName LPAREN FormPars RPAREN DeclarationList LBRACE StatementList RBRACE;
+MethodTypeName ::= (MethodTypeName) Type:returnType IDENT:name;
+FormPars ::= (FormalParameters) /* empty for now */;
+
+StatementList ::= (StatementListNotEmpty) StatementList Statement
+				|	(StatementListEmpty) /* or empty */;
+			
+Statement ::= (StatementAssignExpression) Designator ASSIGN Expression SEMICOLON
+			| (StatementMultiAssign) LSQUARE MultiDesignator RSQUARE ASSIGN Designator SEMICOLON
+			| (StatementIncrement) Designator INC SEMICOLON
+			| (StatementDecrement) Designator DEC SEMICOLON
+			| (StatementPrint) PRINT LPAREN Expression RPAREN SEMICOLON
+			| (StatementPrintWidth) PRINT LPAREN Expression COMMA NUMBER:width RPAREN SEMICOLON
+			| (StatementRead) READ LPAREN Designator RPAREN SEMICOLON
+			| (StatementAllocateArray) Designator ASSIGN NEW Type LSQUARE Expression RSQUARE SEMICOLON
+			| (StatementAllocateMatrix) Designator ASSIGN NEW Type LSQUARE Expression:rowNum RSQUARE LSQUARE Expression:colNum RSQUARE SEMICOLON;
+			
+MultiDesignator ::= (MultiDesignatorWithDesignator) Designator COMMA MultiDesignator
+			| (MultiDesignatorSkip) COMMA MultiDesignator
+			| (MultiDesignatorLast) Designator
+			| (MultiDesignatorLastComma) Designator COMMA;
+
+Designator ::= (SimpleDesignator) IDENT:designatorName
+			| (ArrayElementDesignator) IDENT:arrayName LSQUARE Expression RSQUARE
+			| (MatrixElementDesignator) IDENT:matrixName LSQUARE Expression RSQUARE LSQUARE Expression RSQUARE;
+
+
+Expression ::= (Expression) Term AddOperations;
+
+AddOperations ::= (OperationsAdd) AddOperations Addop:operator Term
+			| (OperationsAddEmpty) /* or empty */;
+
+Addop ::= (OperatorPlus) ADD
+			| (OperatorMinus) SUB;
+
+Term ::= (TermSimple) Factor MulOperations
+			| (TermNegated) SUB Factor MulOperations;
+
+MulOperations ::= (OperationsMultiplication) MulOperations Mulop:operator Factor
+			| (OperationsMultiplicationEmpty) /* or empty */;
+
+Mulop ::= (OperatorAsterisk) MUL
+			| (OperatorSlash) DIV
+			| (OperatorPercent) MOD;
+
+Factor ::= (FactorNumericConstant) NUMBER:value
+			| (FactorCharConstant) CHAR:value
+			| (FactorDesignator) Designator:symbolName
+			| (FactorInParenthesis) LPAREN Expression RPAREN;
