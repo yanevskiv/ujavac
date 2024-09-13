@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="PP1" default="build" basedir=".">
+    <target name="clean">
+        <delete dir="build"/>
+        <delete file="src/rs/ac/bg/etf/pp1/Yylex.java"/>
+        <delete file="src/rs/ac/bg/etf/pp1/Yylex.java~"/>
+        <delete file="src/rs/ac/bg/etf/pp1/MJParser.java"/>
+        <delete file="src/rs/ac/bg/etf/pp1/sym.java"/>
+        <delete file="spec/mjparser_astbuild.cup"/>
+        <delete>
+            <fileset dir="src/rs/ac/bg/etf/pp1/ast" includes="*.java"/>
+            <fileset dir="test" includes="*.obj"/>
+        </delete>
+    </target>
+    
+    <target name="cleanLogs">
+        <delete>
+            <fileset dir="logs" includes="*.log"/>
+            <fileset dir="logs" includes="*.log.*"/>
+        </delete>
+    </target>
+    
+    <target name="genLexer">
+        <java jar="lib/JFlex.jar" fork="true">
+            <arg value="-d"/>
+            <arg value="src/rs/ac/bg/etf/pp1"/>
+            <arg value="spec/mjlexer.lex"/>
+        </java>
+    </target>
+    
+    <target name="genParser">
+        <java jar="lib/cup_v10k.jar" fork="true">
+            <arg value="-parser"/>
+            <arg value="MJParser"/>
+            <arg value="-destdir"/>
+            <arg value="src/rs/ac/bg/etf/pp1"/>
+            <arg value="-ast"/>
+            <arg value="src.rs.ac.bg.etf.pp1.ast"/>
+            <arg value="-buildtree"/>
+            <!--arg value="-dump_states"/-->
+            <arg value="spec/mjparser.cup"/>
+        </java>
+        <replace dir="src" token="src.rs.ac.bg.etf.pp1" value="rs.ac.bg.etf.pp1"/>
+    </target>
+    
+    <target name="genSources" depends="clean,genLexer,genParser">
+        
+    </target>
+    
+    <target name="genCompiler">
+        <mkdir dir="build"/>
+        <javac srcdir="src" destdir="build" includeantruntime="false">
+            <classpath>
+                <pathelement path="lib/JFlex.jar"/>
+                <pathelement path="lib/cup_v10k.jar"/>
+                <pathelement path="lib/log4j-1.2.17.jar"/>
+                <pathelement path="lib/mj-runtime-1.1.jar"/>
+                <pathelement path="lib/symboltable-1-1.jar"/>                
+            </classpath>
+        </javac>
+        <copy file="config/log4j.xml" todir="build"/>
+    </target>
+    
+    <target name="objCompile" depends="genCompiler">
+        <java classpath="build" classname="rs.ac.bg.etf.pp1.MJCompiler">
+            <arg value="test/program.mj"/>
+            <arg value="test/program.obj"/>
+            <classpath>
+                <pathelement path="lib/JFlex.jar"/>
+                <pathelement path="lib/cup_v10k.jar"/>
+                <pathelement path="lib/log4j-1.2.17.jar"/>
+                <pathelement path="lib/mj-runtime-1.1.jar"/>
+                <pathelement path="lib/symboltable-1-1.jar"/>                
+            </classpath>     
+        </java>
+    </target>
+    
+    <target name="objDisasm">
+        <java classname="rs.etf.pp1.mj.runtime.disasm">
+            <arg value="test/program.obj" />
+            <classpath>
+                <pathelement location="lib/mj-runtime-1.1.jar" />
+            </classpath>
+        </java>
+    </target>
+    
+    <target name="objRun">
+        <java classname="rs.etf.pp1.mj.runtime.Run" classpath="lib/mj-runtime-1.1.jar">
+            <arg value="test/program.obj" />
+        </java>
+    </target>
+    
+    <target name="objDebug">
+        <java classname="rs.etf.pp1.mj.runtime.Run" classpath="lib/mj-runtime-1.1.jar">
+            <arg value="test/program.obj" />
+            <arg value="-debug" />
+        </java>
+    </target>
+
+</project>

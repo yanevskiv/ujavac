@@ -1,0 +1,11 @@
+/build/
+/nbproject/
+/logs/*.log
+/logs/*.log.*
+/src/rs/ac/bg/etf/pp1/ast/*.java
+/src/rs/ac/bg/etf/pp1/MJParser.java
+/src/rs/ac/bg/etf/pp1/Yylex.java
+/src/rs/ac/bg/etf/pp1/Yylex.java~
+/src/rs/ac/bg/etf/pp1/sym.java
+/spec/mjparser_astbuild.cup
+/test/*.obj

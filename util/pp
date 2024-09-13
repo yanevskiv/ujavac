@@ -1,0 +1,119 @@
+#!/bin/bash
+
+CALLER_DIR="$PWD"
+SCRIPT_DIR="$(dirname $(readlink -f "$0"))"
+PROJECT_ROOT="$SCRIPT_DIR/.."
+
+cd "$PROJECT_ROOT"
+
+function show_help()
+{
+cat << EOF
+Usage: pp { OPTION LIST }
+Utility script for 'Programski Prevodioci 1' school project
+
+Options:
+  -h,  --help         Show help
+  -l,  --load         Load the code into program.mj
+  -c,  --clean        Clean project
+  -cl, --clean-logs   Clean logs directory
+  -gl, --gen-lexer    Generate 'Yylex.java'
+  -gp, --gen-parser   Generate 'MJparser.java' and 'ast/' directory
+  -gs, --gen-sources  Generate lexer and parser
+  -gc, --gen-compiler Generate compiler  
+  -oc, --obj-compile  Compile 'program.mj' to 'program.obj'
+  -oD, --obj-disasm   Disassemble object
+  -or, --obj-run      Run object
+  -od, --obj-debug    Debug object
+
+Examples:
+  pp --clean --clean-logs
+  pp --gen-lexer --gen--parser --gen-compiler
+  pp --obj-compile
+  pp --obj-run
+  pp -c -cl -gs -gc -or
+
+Copyright (C) 2024 Ivan Janevski 
+MIT License
+EOF
+}
+
+function load_file() {
+    file="$1"
+    ext="${file##*.}"
+    if [ "$ext" != "mj"  ]; then
+        file="${file}.mj"
+    fi
+    pushd "$CALLER_DIR" > /dev/null
+    if [ -f "$file" ]; then 
+        cat "$file" > "$PROJECT_ROOT/test/program.mj"
+        echo "Success: Loaded '$file' from file"
+    elif [ -f "$PROJECT_ROOT/test/$file" ]; then
+        cat "$PROJECT_ROOT/test/$file" \
+            > "$PROJECT_ROOT/test/program.mj"
+        echo "Success: Loaded '$file' from tests"
+    else 
+        echo "Error: Cannot stat '$file'" 
+        exit 1;
+    fi
+    popd > /dev/null
+}
+
+
+if [ $# -eq 0 ]; then
+    show_help;
+    exit 0
+fi
+
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            show_help
+        ;;
+        -l|--load)
+            shift
+            if [ $# == 0 ]; then
+                echo "Note: -l, --load requires an argument"
+                echo "List of available tests:\n"
+                find "$PROJECT_ROOT/test" -type f -name '*.mj' ! -name 'program.mj' -printf "  %f\n" | sort
+                exit 1
+            fi
+            load_file "$1"
+        ;;
+        -c|--clean)
+            ant clean
+        ;;
+        -cl|--clean-logs)
+            ant cleanLogs
+        ;;
+        -gl|--gen-lexer)
+            ant genLexer
+        ;;
+        -gp|--gen-parser)
+            ant genParser
+        ;;
+        -gs|--gen-sources)
+            ant genSources
+        ;;
+        -gc|--gen-compiler)
+            ant genCompiler
+        ;;
+        -oc|--obj-compile)
+            ant objCompile
+        ;;
+        -oD|--obj-disasm)
+            ant objDisasm
+        ;;
+        -or|--obj-run)
+            ant objRun
+        ;;
+        -od|--obj-debug)
+            ant objDebug
+        ;;
+        *)
+            echo "Unknown option: $1"
+        ;;
+    esac
+    shift
+done
