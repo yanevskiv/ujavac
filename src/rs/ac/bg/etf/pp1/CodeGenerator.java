@@ -1,18 +1,59 @@
 package rs.ac.bg.etf.pp1;
 
+import org.apache.log4j.Logger;
+
 import rs.ac.bg.etf.pp1.ast.*;
 import rs.etf.pp1.mj.runtime.Code;
 import rs.etf.pp1.symboltable.concepts.Obj;
 import rs.etf.pp1.symboltable.concepts.Struct;
 
 public class CodeGenerator extends VisitorAdaptor {
+	// Logger
+	private static final Logger logger = Logger.getLogger(CodeGenerator.class);
+
 	private int mainPC = 0;
 
+	private int nErrors = 0;
+
+	// Show error
+	private void showError(String message, SyntaxNode info) {
+		nErrors++;
+		StringBuilder msg = new StringBuilder(message);
+		int line = (info == null) ? 0 : info.getLine();
+		if (line != 0) {
+			msg.append(" on line  ").append(line);
+		}
+		logger.error(msg.toString());
+	}
+
+	// Show info
+	public void showInfo(String message, SyntaxNode info) {
+		StringBuilder msg = new StringBuilder(message);
+		int line = (info == null) ? 0 : info.getLine();
+		if (line != 0) {
+			msg.append(" on line ").append(line);
+		}
+		logger.info(msg.toString());
+	}
+
+	// Show visit info
+	public void showVisitInfo(SyntaxNode info) {
+		showInfo(" --- Visiting (code) '" + info.getClass().getSimpleName() + "'", info);
+	}
+
+	// Get nErrors
+	public int getnErrors() {
+		return nErrors;
+	}
+
+	// Get mainPC
 	public int getMainPc() {
 		return mainPC;
 	}
 
+
 	public void visit(MethodTypeName methodTypeName) {
+		showVisitInfo(methodTypeName);
 
 		// Main method
 		if ("main".equalsIgnoreCase(methodTypeName.getName())) {
@@ -29,6 +70,8 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(Method method) {
+		showVisitInfo(method);
+
 		// Close method
 		Code.put(Code.exit);
 		Code.put(Code.return_);
@@ -37,14 +80,17 @@ public class CodeGenerator extends VisitorAdaptor {
 	// Factors
 
 	public void visit(FactorNumber factor) {
+		showVisitInfo(factor);
 		Code.loadConst(factor.getValue());
 	}
 
 	public void visit(FactorChar factor) {
+		showVisitInfo(factor);
 		Code.loadConst(factor.getValue().charAt(1));
 	}
 
 	public void visit(FactorDesignator factor) {
+		showVisitInfo(factor);
 		if (factor.getDesignator() instanceof DesignatorIdent) {
 			int kind = factor.getDesignator().obj.getKind();
 			if (kind == Obj.Var) {
@@ -71,6 +117,7 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 	
 	public void visit(FactorListNext listElem) {
+		showVisitInfo(listElem);
 		if (listElem.getMulop() instanceof MulopMul) {
 			Code.put(Code.mul);
 		} else if (listElem.getMulop() instanceof MulopDiv) {
@@ -81,6 +128,7 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(TermListNext listElem) {
+		showVisitInfo(listElem);
 		if (listElem.getAddop() instanceof AddopAdd) {
 			Code.put(Code.add);
 		} else if (listElem.getAddop() instanceof AddopSub) {
@@ -89,6 +137,7 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(TermNegative term) {
+		showVisitInfo(term);
 		Code.loadConst(-1);
 		Code.put(Code.mul);
 	}
@@ -96,10 +145,10 @@ public class CodeGenerator extends VisitorAdaptor {
 	// Statements
 
 	public void visit(StatementAssignExpr statement) {
+		showVisitInfo(statement);
 		if (statement.getDesignator() instanceof DesignatorIdent) {
 			Code.store(statement.getDesignator().obj);
-		} else if (statement.getDesignator() instanceof DesignatorArray) { // DesignatorArray
-			// Code generator is not compatible with the Runtime, hence this
+		} else if (statement.getDesignator() instanceof DesignatorArray) {
 			Code.load(statement.getDesignator().obj);
 			Code.put(Code.dup_x2);
 			Code.put(Code.pop);
@@ -108,11 +157,11 @@ public class CodeGenerator extends VisitorAdaptor {
 			Code.put(Code.dup_x2);
 			Code.put(Code.pop);
 
-			// Matrix index (2 + y * m + x)
+			// Matrix access (2 + y * w + x)
 			Code.load(statement.getDesignator().obj);
 			Code.put(Code.dup_x2);
 			Code.loadConst(0);
-			Code.put(Code.aload); // Load m
+			Code.put(Code.aload); // Load w
 			Code.put(Code.mul);
 			Code.put(Code.add);
 			Code.loadConst(2);
@@ -126,6 +175,8 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementInc statement) {
+		showVisitInfo(statement);
+
 		// Need the index on the stack
 		if (statement.getDesignator() instanceof DesignatorArray) {
 			Code.put(Code.dup); 
@@ -136,7 +187,8 @@ public class CodeGenerator extends VisitorAdaptor {
 
 		// Cannot increment matrix
 		if (statement.getDesignator() instanceof DesignatorMatrix) {
-			throw new RuntimeException("Currently unimplemented: cannot increment matrix");
+			showError("Currently unimplemented: cannot increment matrix", statement);
+			return;
 		}
 
 		// Load array value
@@ -163,6 +215,8 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementDec statement) {
+		showVisitInfo(statement);
+
 		// Need the index on the stack
 		if (statement.getDesignator() instanceof DesignatorArray) {
 			Code.put(Code.dup);
@@ -172,7 +226,8 @@ public class CodeGenerator extends VisitorAdaptor {
 		Code.load(statement.getDesignator().obj);
 
 		if (statement.getDesignator() instanceof DesignatorMatrix) {
-			throw new RuntimeException("Currently unimplemented: decrement increment matrix");
+			showError("Currently unimplemented: decrement increment matrix", statement);
+			return;
 		}
 
 		// Load array value
@@ -198,6 +253,9 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementPrint statement) {
+		showVisitInfo(statement);
+
+		// Print integer or character
 		Code.loadConst(1);
 		Struct exprStruct = statement.getExpr().struct;
 		if (exprStruct == SemanticAnalyzer.IntType) {
@@ -208,6 +266,8 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementPrintWidth statement) {
+		showVisitInfo(statement);
+		// Print width
 		Code.loadConst(statement.getWidth());
 		Struct exprStruct = statement.getExpr().struct;
 		if (exprStruct == SemanticAnalyzer.IntType) {
@@ -218,6 +278,8 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementRead statement) {
+		showVisitInfo(statement);
+
 		Obj designatorObj;
 		Struct designatorType;
 
@@ -228,7 +290,8 @@ public class CodeGenerator extends VisitorAdaptor {
 			designatorObj = ((DesignatorArray) statement.getDesignator()).obj;
 			designatorType = designatorObj.getType().getElemType();
 		} else  {
-			throw new RuntimeException("Unsupported: cannot read matrix");
+			showError("Unsupported: cannot read matrix", statement);
+			return;
 		}
 
 		if (designatorType == SemanticAnalyzer.IntType) {
@@ -248,6 +311,7 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementNewArray statement) {
+		showVisitInfo(statement);
 		Code.put(Code.newarray);
 		if (statement.getType().struct == SemanticAnalyzer.CharType) {
 			Code.put(0);
@@ -258,6 +322,7 @@ public class CodeGenerator extends VisitorAdaptor {
 	}
 
 	public void visit(StatementNewMatrix statement) {
+		showVisitInfo(statement);
 		// Preserve dimensions
 		Code.put(Code.dup2);
 
@@ -283,7 +348,7 @@ public class CodeGenerator extends VisitorAdaptor {
 		Code.put(Code.pop);
 		Code.put(Code.astore);
 
-		// Store dimension 2
+		// Store dimension 0
 		Code.put(Code.dup2);
 		Code.put(Code.pop);
 		Code.put(Code.dup_x1);

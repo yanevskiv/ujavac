@@ -67,5 +67,7 @@ program test301
 		
 		print(mat[1][2]); // 4
 		print(mat[0][2]); // 5
+
+		// Result: 966bc-445
 	}
 }

@@ -71,7 +71,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 
 	// Show visit info
 	public void showVisitInfo(SyntaxNode info) {
-		showInfo("Visiting " + info.getClass().getSimpleName(), info);
+		showInfo(" --- Visiting (semantic) '" + info.getClass().getSimpleName() + "'", info);
 	}
 
 	// Insert a type to symbol table
@@ -100,7 +100,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			throw new Exception(name + " symbol not found");
 		}
 		// Check if type
-		if (typeObj.getKind() != Obj.Type) { // Not a type
+		if (typeObj.getKind() != Obj.Type) {
 			throw new Exception(name + " not a type");
 		}
 
@@ -192,7 +192,7 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 				showError("Invalid constant type '" + typeName + "'. Only int, bool, char can be constants!", declaration);
 			} 
 
-			logger.debug("New constant: '" + typeName + " " + constName);
+			logger.debug("New constant: '" + typeName + " " + constName + "'");
 		} catch (Exception ex) {
 			showError("Unsupported type name '" + typeName + "'", declaration);
 			type.struct = VoidType;
@@ -211,12 +211,12 @@ public class SemanticAnalyzer extends VisitorAdaptor {
 			VarArray varArray = (VarArray) symbol;
 			varArray.obj = Tab.insert(Obj.Var, varArray.getSymbolName(), new Struct(Struct.Array, typeStruct));
 			varArray.obj.setAdr(adrMethod++);
-			showInfo("New varSymbol: " + structToTypeName(typeStruct) + varArray.getSymbolName() + "[]",  symbol);
+			showInfo("New varArray: " + structToTypeName(typeStruct) + " " + varArray.getSymbolName() + "[]",  symbol);
 		} else {
 			VarMatrix varMatrix = (VarMatrix) symbol;
 			varMatrix.obj = Tab.insert(Obj.Var, varMatrix.getSymbolName(), new Struct(Struct.Array, typeStruct));
 			varMatrix.obj.setAdr(adrMethod++);
-			showInfo("New varSymbol: " + structToTypeName(typeStruct) + varMatrix.getSymbolName() + "[][]",  symbol);
+			showInfo("New varMatrix: " + structToTypeName(typeStruct) + " " + varMatrix.getSymbolName() + "[][]",  symbol);
 		}
 	}
 

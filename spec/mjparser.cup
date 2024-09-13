@@ -71,7 +71,6 @@ nonterminal MethodList;
 nonterminal FormPars;
 nonterminal StatementList;
 nonterminal Statement;
-nonterminal MultiDesignator;
 nonterminal TermList;
 nonterminal FactorList;
 nonterminal Addop;
@@ -119,13 +118,12 @@ Method ::= (Method) MethodTypeName:methodTypeName LPAREN FormPars RPAREN DeclLis
 
 MethodTypeName ::= (MethodTypeName) Type:returnType IDENT:name;
 
-FormPars ::= (FormPars) /* empty for now */;
+FormPars ::= (FormPars) /* empty */;
 
 StatementList ::= (StatementListNext) StatementList Statement
 				|	(StatementListEmpty) /* or empty */;
 			
 Statement ::= (StatementAssignExpr) Designator ASSIGN Expr SEMICOLON
-			| (StatementMultiAssign) LSQUARE MultiDesignator RSQUARE ASSIGN Designator SEMICOLON
 			| (StatementInc) Designator INC SEMICOLON
 			| (StatementDec) Designator DEC SEMICOLON
 			| (StatementPrint) PRINT LPAREN Expr RPAREN SEMICOLON
@@ -133,15 +131,10 @@ Statement ::= (StatementAssignExpr) Designator ASSIGN Expr SEMICOLON
 			| (StatementRead) READ LPAREN Designator RPAREN SEMICOLON
 			| (StatementNewArray) Designator ASSIGN NEW Type LSQUARE Expr RSQUARE SEMICOLON
 			| (StatementNewMatrix) Designator ASSIGN NEW Type LSQUARE Expr:rowNum RSQUARE LSQUARE Expr:colNum RSQUARE SEMICOLON;
-			
-MultiDesignator ::= (MultiDesignatorWithDesignator) Designator COMMA MultiDesignator
-			| (MultiDesignatorSkip) COMMA MultiDesignator
-			| (MultiDesignatorLast) Designator
-			| (MultiDesignatorLastComma) Designator COMMA;
 
 Designator ::= (DesignatorIdent) IDENT:designatorName
 			| (DesignatorArray) IDENT:arrayName LSQUARE Expr RSQUARE
-			| (DesignatorMatrix) IDENT:matrixName LSQUARE Expr RSQUARE LSQUARE Expr RSQUARE;
+			| (DesignatorMatrix) IDENT:matrixName LSQUARE Expr:rowNum RSQUARE LSQUARE Expr:colNum RSQUARE;
 
 Expr ::= (Expr) Term TermList;
 

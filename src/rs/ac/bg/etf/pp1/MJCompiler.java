@@ -69,7 +69,7 @@ public class MJCompiler {
 			
 			// Semantic errors
 			if (semanticAnalyzer.getnErrors() > 0) {
-				logger.info("Semantic parser error " + semanticAnalyzer.getnErrors());
+				logger.info("Semantic parser error count: " + semanticAnalyzer.getnErrors());
 				return;
 			}
 
@@ -85,6 +85,12 @@ public class MJCompiler {
 			CodeGenerator codeGenerator = new CodeGenerator();
 			prog.traverseBottomUp(codeGenerator);
 
+			// Code generation errors
+			if (codeGenerator.getnErrors() > 0) {
+				logger.info("Code generator error count: " + codeGenerator.getnErrors());
+				return;
+			}
+
 			// Code write
 			Code.dataSize = semanticAnalyzer.getnVars();
 			Code.mainPc = codeGenerator.getMainPc();
@@ -92,6 +98,7 @@ public class MJCompiler {
 				objFile.delete();
 			}
 
+			// Write to file
 			logger.info("Writing to " + objFile.getPath());
 			try (OutputStream outputStream = new FileOutputStream(objFile)) {
 				Code.write(outputStream);
